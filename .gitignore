@@ -1,0 +1,49 @@
+# ==========================================
+# DSIE CODEX - ARM64 SECURE .GITIGNORE
+# ==========================================
+
+# 1. API Keys & Secrets (CRITICAL)
+.env
+client_secret.json
+token.json
+dsie-codex-llc-*.json
+
+# 2. Heavy Data & OSINT State (Protects Repo Size)
+dashboard/*.json
+dashboard/OSINT_System_State/*.json
+organizer_state.json
+
+# 3. Logs & Temp Files
+logs/
+organizer_log.txt
+*.log
+
+# 4. Archives, Audio, and Installers (Gigabytes of dead weight)
+archive/
+
+# 5. AI Model Weights & Compiled Binaries
+# (Keeps the directory tree visible, but blocks the massive files)
+*.onnx
+*.bin
+*.safetensors
+*.gguf
+*.pt
+*.exe
+*.dll
+*.zip
+*.tar.bz2
+*.tar.gz
+*.lib
+*.msi
+*.mp3
+*.wav
+
+# 6. PocketBase Database
+bus/pocketbase/pb_data/
+
+# 7. Python Cache
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/

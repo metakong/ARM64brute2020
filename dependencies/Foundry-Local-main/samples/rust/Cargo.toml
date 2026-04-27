@@ -1,0 +1,13 @@
+[workspace]
+members = [
+    "foundry-local-webserver",
+    "tool-calling-foundry-local",
+    "native-chat-completions",
+    "audio-transcription-example",
+    "embeddings",
+    "tutorial-chat-assistant",
+    "tutorial-document-summarizer",
+    "tutorial-tool-calling",
+    "tutorial-voice-to-text",
+]
+resolver = "2"

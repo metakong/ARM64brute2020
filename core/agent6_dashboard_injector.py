@@ -1,0 +1,226 @@
+import os
+
+INDEX_PATH = r'C:\foundry_project\dashboard\index.html'
+
+DASHBOARD_HTML = """<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSIE Codex | CEO Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/pocketbase/dist/pocketbase.umd.js"></script>
+    <style>
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        .tab-active { border-bottom: 2px solid #10b981; color: #10b981; }
+        .tab-inactive { color: #9ca3af; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 h-screen flex flex-col font-mono">
+
+    <header class="bg-gray-800 border-b border-gray-700 shadow-lg flex flex-col">
+        <div class="p-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse" id="global-pulse"></div>
+                <h1 class="text-xl font-bold tracking-widest text-white">DSIE CODEX <span class="text-gray-400 text-sm">| DASHBOARD</span></h1>
+            </div>
+            <div class="text-sm text-gray-400" id="connection-status">Connecting to Bus...</div>
+        </div>
+        <div class="flex space-x-6 px-6 bg-gray-800/80 text-sm font-semibold tracking-wider">
+            <button id="btn-bus" onclick="switchView('bus')" class="pb-2 tab-active transition-colors uppercase">Cognitive Bus (Local)</button>
+            <button id="btn-feed" onclick="switchView('feed')" class="pb-2 tab-inactive hover:text-white transition-colors uppercase">News Feed</button>
+            <button id="btn-merc" onclick="switchView('merc')" class="pb-2 tab-inactive hover:text-white transition-colors uppercase">Mercenary Terminal (Cloud)</button>
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-hidden relative">
+        <div id="view-bus" class="absolute inset-0 flex p-6 space-x-6 transition-opacity duration-300">
+            <section class="flex-1 flex flex-col bg-gray-800 rounded-lg border border-gray-700 shadow-xl overflow-hidden">
+                <div class="p-3 border-b border-gray-700 bg-gray-800/50">
+                    <h2 class="text-xs uppercase tracking-widest text-gray-400 font-semibold">Live Transcription Feed</h2>
+                </div>
+                <div id="feed-container" class="flex-1 overflow-y-auto p-6 space-y-6"></div>
+            </section>
+            <aside class="w-80 flex flex-col space-y-6">
+                <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-5">
+                    <h2 class="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-4">Active Agents</h2>
+                    <div class="flex justify-between items-center p-2 bg-gray-700/50 rounded">
+                        <span class="text-sm">Qwen-4B (NPU)</span>
+                        <span id="qwen-badge" class="text-xs bg-gray-900 text-gray-500 px-2 py-1 rounded border border-gray-700">WAITING</span>
+                    </div>
+                </div>
+                <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl flex flex-col flex-1 overflow-hidden">
+                    <div class="p-4 border-b border-gray-700 bg-gray-800/50 flex justify-between items-center">
+                        <h2 class="text-xs uppercase tracking-widest text-purple-400 font-semibold">The Vault</h2>
+                    </div>
+                    <div id="vault-container" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
+                </div>
+            </aside>
+        </div>
+
+        <div id="view-feed" class="absolute inset-0 flex p-6 space-x-6 opacity-0 pointer-events-none transition-opacity duration-300">
+            <section class="flex-1 flex flex-col bg-gray-800 rounded-lg border border-gray-700 shadow-xl overflow-hidden">
+                <div class="p-3 border-b border-gray-700 bg-gray-800/50 flex justify-between items-center">
+                    <h2 class="text-xs uppercase tracking-widest text-gray-400 font-semibold">News Feed</h2>
+                    <span id="feed-status" class="text-[10px] text-gray-500 uppercase">Checking Data...</span>
+                </div>
+                <div id="pillar-container" class="flex-1 overflow-y-auto p-6 space-y-8"></div>
+            </section>
+            <aside id="article-reader" class="w-1/2 hidden flex flex-col bg-gray-900 border-l border-gray-700 shadow-2xl">
+                <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-800">
+                    <span id="reader-pillar" class="text-xs font-bold text-green-500 uppercase tracking-tighter"></span>
+                    <button onclick="closeReader()" class="text-gray-500 hover:text-white text-xs">CLOSE [X]</button>
+                </div>
+                <div id="reader-content" class="flex-1 overflow-y-auto p-8 prose prose-invert max-w-none text-gray-300"></div>
+            </aside>
+        </div>
+
+        <div id="view-merc" class="absolute inset-0 flex p-6 space-x-6 opacity-0 pointer-events-none transition-opacity duration-300">
+            <section class="flex-1 flex flex-col bg-gray-800 rounded-lg border border-gray-700 shadow-xl overflow-hidden">
+                <div class="p-3 border-b border-gray-700 bg-gray-800/50 flex justify-between items-center">
+                    <h2 class="text-xs uppercase tracking-widest text-gray-400 font-semibold">Task Execution Terminal</h2>
+                    <span id="active-model-display" class="text-[10px] text-green-400 border border-green-800 bg-green-900/30 px-2 py-1 rounded"></span>
+                </div>
+                <div id="merc-chat-container" class="flex-1 overflow-y-auto p-6 space-y-6"></div>
+                <div class="p-4 border-t border-gray-700 bg-gray-900">
+                    <div class="flex space-x-3">
+                        <textarea id="merc-input" rows="2" class="flex-1 bg-gray-800 border border-gray-600 rounded text-sm p-3 text-gray-100 focus:outline-none focus:border-green-500 resize-none" placeholder="Enter task directive..."></textarea>
+                        <button id="merc-send" class="bg-green-600 hover:bg-green-500 text-white px-6 rounded font-semibold transition-colors">EXECUTE</button>
+                    </div>
+                </div>
+            </section>
+            <aside class="w-80 flex flex-col space-y-6">
+                <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-5">
+                    <h2 class="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-4">Master Synapse Router</h2>
+                    <label class="block text-xs text-gray-500 mb-1">Target Provider & Model</label>
+                    <select id="model-select" class="w-full bg-gray-900 border border-gray-600 rounded text-xs p-2 text-gray-100 focus:outline-none mb-4"></select>
+                </div>
+                <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-5 flex-1 flex flex-col overflow-hidden">
+                    <h2 class="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-2">API Keychains</h2>
+                    <div id="keychain-container" class="space-y-3 overflow-y-auto pr-2 flex-1"></div>
+                    <button id="save-keys" class="w-full bg-gray-700 hover:bg-gray-600 text-xs py-2 rounded mt-4 transition-colors">Save Keys Locally</button>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+    <script>
+        const pb = new PocketBase('http://127.0.0.1:8090');
+
+        function switchView(view) {
+            ['bus', 'merc', 'feed'].forEach(v => {
+                const el = document.getElementById('view-' + v);
+                const btn = document.getElementById('btn-' + v);
+                if (!el || !btn) return;
+                
+                if (v === view) {
+                    el.classList.replace('opacity-0', 'opacity-100');
+                    el.classList.remove('pointer-events-none');
+                    btn.className = "pb-2 tab-active transition-colors uppercase";
+                    if (v === 'feed') initFeed();
+                } else {
+                    el.classList.replace('opacity-100', 'opacity-0');
+                    el.classList.add('pointer-events-none');
+                    btn.className = "pb-2 tab-inactive hover:text-white transition-colors uppercase";
+                }
+            });
+        }
+
+        async function initFeed() {
+            const statusEl = document.getElementById('feed-status');
+            const container = document.getElementById('pillar-container');
+            
+            try {
+                statusEl.innerText = "Loading...";
+                const res = await fetch('OSINT_System_State/agent5_content_staging.json');
+                if (!res.ok) throw new Error('File not found or blocked.');
+                
+                const data = await res.json();
+                const pillars = [
+                    "CLIENT PROSPECTING & COMPETITIVE INTELLIGENCE",
+                    "TECHNICAL TOOLING & STACK MAINTENANCE",
+                    "STRATEGIC BUSINESS & TECHNICAL EDUCATION",
+                    "SPORTS & RECREATIONAL AWARENESS"
+                ];
+                
+                container.innerHTML = '';
+                let totalArticles = 0;
+                
+                pillars.forEach(p => {
+                    const articles = data.filter(a => a.Pillar === p);
+                    if (articles.length > 0) {
+                        totalArticles += articles.length;
+                        const section = document.createElement('div');
+                        section.className = "mb-8";
+                        section.innerHTML = `<h3 class="text-xs font-bold text-gray-500 border-b border-gray-700 pb-2 mb-4 uppercase tracking-widest">${p}</h3>`;
+                        
+                        articles.forEach(a => {
+                            const item = document.createElement('div');
+                            item.className = "group cursor-pointer p-4 hover:bg-gray-700/30 rounded transition-all mb-2 border-l-2 border-transparent hover:border-green-500 bg-gray-800/30";
+                            item.innerHTML = `
+                                <h4 class="text-sm font-bold text-white group-hover:text-green-400 uppercase tracking-tight">${a['UI Headline']}</h4>
+                                <p class="text-xs text-gray-400 mt-1 leading-relaxed">${a['UI Single-Sentence Summary']}</p>
+                            `;
+                            item.onclick = () => openReader(a);
+                            section.appendChild(item);
+                        });
+                        container.appendChild(section);
+                    }
+                });
+                
+                statusEl.innerText = `${totalArticles} ARTICLES`;
+                
+            } catch (err) {
+                console.error(err);
+                statusEl.innerHTML = `<span class="text-red-500 font-bold">ERROR LOADING FEED</span>`;
+                container.innerHTML = `
+                    <div class="bg-red-900/20 border border-red-800 text-red-400 p-4 rounded text-sm">
+                        <b>Data Fetch Failed.</b><br><br>
+                        If you opened this file by double-clicking it (<code>file:///C:/...</code>), your browser is blocking the local JSON file for security (CORS).<br><br>
+                        <b>To Fix This:</b> Open a terminal, cd into your dashboard folder, and run:<br>
+                        <code>python -m http.server 8080</code><br><br>
+                        Then open your browser to <b>http://localhost:8080</b>
+                    </div>
+                `;
+            }
+        }
+
+        function openReader(article) {
+            const reader = document.getElementById('article-reader');
+            reader.classList.remove('hidden');
+            document.getElementById('reader-pillar').innerText = article.Pillar;
+            const content = article['Longform Markdown Article Text'].replace(/\\\\n/g, '<br>').replace(/\\n/g, '<br>');
+            document.getElementById('reader-content').innerHTML = `
+                <h1 class="text-xl font-bold mb-6 text-white border-b border-gray-800 pb-4">${article['UI Headline']}</h1>
+                <div class="text-sm leading-7 space-y-4">${content}</div>
+            `;
+        }
+
+        function closeReader() { document.getElementById('article-reader').classList.add('hidden'); }
+
+        initDashboard = async () => {
+            try {
+                await pb.collection('transcripts').getList(1, 1);
+                document.getElementById('connection-status').innerHTML = `<span class="text-green-400">● Bus Connected</span>`;
+            } catch (e) {
+                document.getElementById('connection-status').innerHTML = `<span class="text-red-500">● Offline</span>`;
+            }
+        };
+
+        initDashboard();
+        switchView('bus');
+    </script>
+</body>
+</html>"""
+
+def fix_dashboard():
+    print("[AGENT 6] Executing Complete File Overwrite...")
+    with open(INDEX_PATH, 'w', encoding='utf-8') as f:
+        f.write(DASHBOARD_HTML)
+    print(f"[SUCCESS] Dashboard index.html has been completely wiped and fixed.")
+
+if __name__ == "__main__":
+    fix_dashboard()
