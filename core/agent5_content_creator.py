@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import json
 import time
 import random
@@ -8,13 +9,15 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
-load_dotenv(r'C:\foundry_project\.env')
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(str(BASE_DIR / '.env'))
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 client = genai.Client(api_key=GOOGLE_API_KEY)
 
-CONSOLIDATED_BRIEFS_PATH = r'C:\foundry_project\dashboard\consolidated_briefs.json'
-AGENT_5_OUTPUT_PATH = r'C:\foundry_project\dashboard\OSINT_System_State\agent5_content_staging.json'
-LOG_FILE = r'C:\foundry_project\logs\agent5_content_log.txt'
+CONSOLIDATED_BRIEFS_PATH = str(BASE_DIR / 'dashboard' / 'consolidated_briefs.json')
+AGENT_5_OUTPUT_PATH = str(BASE_DIR / 'dashboard' / 'OSINT_System_State' / 'agent5_content_staging.json')
+LOG_FILE = str(BASE_DIR / 'logs' / 'agent5_content_log.txt')
 
 os.makedirs(os.path.dirname(AGENT_5_OUTPUT_PATH), exist_ok=True)
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)

@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import json
 import time
 import random
@@ -7,14 +8,16 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 # --- CONFIGURATION ---
-load_dotenv(r'C:\foundry_project\.env')
+load_dotenv(str(BASE_DIR / '.env'))
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 client = genai.Client(api_key=GOOGLE_API_KEY)
 
-WINNING_URLS_PATH = r'C:\foundry_project\dashboard\winning_urls.json'
-ATOMIC_FACTS_PATH = r'C:\foundry_project\dashboard\OSINT_System_State\atomic_facts_log.json'
-LOG_FILE = r'C:\foundry_project\logs\agent3_extractor_log.txt'
+WINNING_URLS_PATH = str(BASE_DIR / 'dashboard' / 'winning_urls.json')
+ATOMIC_FACTS_PATH = str(BASE_DIR / 'dashboard' / 'OSINT_System_State' / 'atomic_facts_log.json')
+LOG_FILE = str(BASE_DIR / 'logs' / 'agent3_extractor_log.txt')
 
 os.makedirs(os.path.dirname(ATOMIC_FACTS_PATH), exist_ok=True)
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)

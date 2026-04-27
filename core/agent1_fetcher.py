@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import json
 import time
 import re
@@ -11,20 +12,22 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 # --- CONFIGURATION ---
 SCOPES = ['https://www.googleapis.com/auth/drive']
-CLIENT_SECRET_FILE = r'C:\foundry_project\client_secret.json'
-TOKEN_FILE = r'C:\foundry_project\token.json'
+CLIENT_SECRET_FILE = str(BASE_DIR / 'client_secret.json')
+TOKEN_FILE = str(BASE_DIR / 'token.json')
 
-SEED_LIST_PATH = r'C:\foundry_project\OSINT Seed List Generation.md'
-INTAKE_QUEUE_PATH = r'C:\foundry_project\dashboard\morning_intake.json'
-LOCAL_STATE_DIR = r'C:\foundry_project\dashboard\OSINT_System_State'
+SEED_LIST_PATH = str(BASE_DIR / 'OSINT Seed List Generation.md')
+INTAKE_QUEUE_PATH = str(BASE_DIR / 'dashboard' / 'morning_intake.json')
+LOCAL_STATE_DIR = str(BASE_DIR / 'dashboard' / 'OSINT_System_State')
 LOCAL_STATE_PATH = os.path.join(LOCAL_STATE_DIR, 'osint_state.json')
-LOG_FILE = r'C:\foundry_project\logs\agent1_fetcher_log.txt'
+LOG_FILE = str(BASE_DIR / 'logs' / 'agent1_fetcher_log.txt')
 
 # Ensure directories exist
 os.makedirs(LOCAL_STATE_DIR, exist_ok=True)
-os.makedirs(r'C:\foundry_project\logs', exist_ok=True)
+os.makedirs(str(BASE_DIR / 'logs'), exist_ok=True)
 
 def log_action(message):
     print(message)

@@ -4,11 +4,14 @@ import time
 import datetime
 import re
 import json
+from pathlib import Path
 import requests
 import numpy as np
 import sounddevice as sd
 import wave
 from foundry_local_sdk import Configuration, FoundryLocalManager
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --- 0. THE TROJAN HORSE ---
 def execute_trojan_horse():
@@ -102,9 +105,10 @@ class DSIECore:
             wf.writeframes(np.int16(recording * 32767).tobytes())
         return True
 
-    def push_transaction_to_bus(self, user_text, agent_text):
+    def push_transcript(self, role, text):
+        """Send a single transcript record to PocketBase with role/text schema."""
         try:
-            payload = {"speaker": "User", "speaker_text": user_text, "agent1": "Qwen-4B", "agent1_text": agent_text}
+            payload = {"role": role, "text": text}
             requests.post("http://127.0.0.1:8090/api/collections/transcripts/records", json=payload, timeout=0.5)
         except Exception: pass
 
@@ -142,14 +146,16 @@ class DSIECore:
                         # Extract everything after the trigger phrase
                         memory_content = re.sub(r'^(codex note|codex remember)\s*(that)?', '', lower_text, flags=re.IGNORECASE).strip()
                         self.push_to_vault(memory_content, "note")
-                        self.push_transaction_to_bus(clean_text, "[SYSTEM] Saved to Vault.")
+                        self.push_transcript("CEO", clean_text)
+                        self.push_transcript("Codex", "[SYSTEM] Saved to Vault.")
                         self.speak("Memory secured in the vault.")
                         print("\n[LISTENING...]")
                         continue # Skips the NPU generation entirely
                     
                     # Command 2: Clear dashboard
                     if lower_text == "codex clear screen":
-                        self.push_transaction_to_bus(clean_text, "[SYSTEM] Clear command received.")
+                        self.push_transcript("CEO", clean_text)
+                        self.push_transcript("Codex", "[SYSTEM] Clear command received.")
                         self.speak("Clearing dashboard.")
                         print("\n[LISTENING...]")
                         continue
@@ -162,9 +168,10 @@ class DSIECore:
                     ])
                     reply = response.choices[0].message.content.strip()
                     
-                    self.push_transaction_to_bus(clean_text, reply) 
+                    self.push_transcript("CEO", clean_text)
+                    self.push_transcript("Codex", reply)
                     self.speak(reply)
-                    print("\n[LISTENING...]")
+                    print("\n[LISTENING...")
                     
                 except Exception as e:
                     print(f"[!] Processing Error: {e}")

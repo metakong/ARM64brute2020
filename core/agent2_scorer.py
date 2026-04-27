@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import json
 import time
 import random
@@ -6,15 +7,17 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 # --- CONFIGURATION ---
-load_dotenv(r'C:\foundry_project\.env')
+load_dotenv(str(BASE_DIR / '.env'))
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 client = genai.Client(api_key=GOOGLE_API_KEY)
 
-INTAKE_QUEUE_PATH = r'C:\foundry_project\dashboard\morning_intake.json'
-WINNING_URLS_PATH = r'C:\foundry_project\dashboard\winning_urls.json'
-SCORED_LOG_PATH = r'C:\foundry_project\dashboard\OSINT_System_State\scored_intake_log.json'
-LOG_FILE = r'C:\foundry_project\logs\agent2_scorer_log.txt'
+INTAKE_QUEUE_PATH = str(BASE_DIR / 'dashboard' / 'morning_intake.json')
+WINNING_URLS_PATH = str(BASE_DIR / 'dashboard' / 'winning_urls.json')
+SCORED_LOG_PATH = str(BASE_DIR / 'dashboard' / 'OSINT_System_State' / 'scored_intake_log.json')
+LOG_FILE = str(BASE_DIR / 'logs' / 'agent2_scorer_log.txt')
 
 SCORE_THRESHOLD = 80
 BATCH_SIZE = 20  # Batching to avoid Gemini 15 RPM Free Tier limits

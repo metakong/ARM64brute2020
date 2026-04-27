@@ -1,6 +1,8 @@
 import os
+from pathlib import Path
 
-INDEX_PATH = r'C:\foundry_project\dashboard\index.html'
+BASE_DIR = Path(__file__).resolve().parent.parent
+INDEX_PATH = str(BASE_DIR / 'dashboard' / 'index.html')
 
 DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="en" class="dark">
@@ -39,10 +41,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <main class="flex-1 overflow-hidden relative">
         <div id="view-bus" class="absolute inset-0 flex p-6 space-x-6 transition-opacity duration-300">
             <section class="flex-1 flex flex-col bg-gray-800 rounded-lg border border-gray-700 shadow-xl overflow-hidden">
-                <div class="p-3 border-b border-gray-700 bg-gray-800/50">
-                    <h2 class="text-xs uppercase tracking-widest text-gray-400 font-semibold">Live Transcription Feed</h2>
+                <div class="p-3 border-b border-gray-700 bg-gray-800/50 flex justify-between items-center">
+                    <h2 class="text-xs uppercase tracking-widest text-gray-400 font-semibold">Live Comms</h2>
+                    <span id="sse-status" class="text-[10px] text-gray-500 uppercase">Connecting...</span>
                 </div>
-                <div id="feed-container" class="flex-1 overflow-y-auto p-6 space-y-6"></div>
+                <div id="feed-container" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
             </section>
             <aside class="w-80 flex flex-col space-y-6">
                 <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-5">
@@ -201,12 +204,94 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
         function closeReader() { document.getElementById('article-reader').classList.add('hidden'); }
 
+        // --- LIVE COMMS: SSE REALTIME ENGINE ---
+        function appendTranscript(role, text, timestamp) {
+            const container = document.getElementById('feed-container');
+            const bubble = document.createElement('div');
+            const isCEO = role === 'CEO';
+            const timeStr = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+
+            bubble.className = `flex flex-col ${isCEO ? 'items-end' : 'items-start'} animate-fade-in`;
+            bubble.innerHTML = `
+                <div class="text-[10px] text-gray-500 mb-1 ${isCEO ? 'text-right' : 'text-left'} tracking-wider">
+                    ${isCEO ? 'CEO' : 'CODEX'} &middot; ${timeStr}
+                </div>
+                <div class="max-w-[80%] px-4 py-3 rounded-lg text-sm leading-relaxed ${
+                    isCEO
+                        ? 'bg-blue-900/40 border border-blue-700/50 text-blue-100'
+                        : 'bg-green-900/40 border border-green-700/50 text-green-100'
+                } shadow-lg">
+                    ${text}
+                </div>
+            `;
+            container.appendChild(bubble);
+            container.scrollTop = container.scrollHeight;
+
+            // Update Qwen badge activity
+            if (!isCEO) {
+                const badge = document.getElementById('qwen-badge');
+                badge.innerText = 'ACTIVE';
+                badge.className = 'text-xs bg-green-900 text-green-400 px-2 py-1 rounded border border-green-700';
+                setTimeout(() => {
+                    badge.innerText = 'WAITING';
+                    badge.className = 'text-xs bg-gray-900 text-gray-500 px-2 py-1 rounded border border-gray-700';
+                }, 3000);
+            }
+        }
+
+        async function loadRecentTranscripts() {
+            try {
+                const resp = await fetch('http://127.0.0.1:8090/api/collections/transcripts/records?sort=-created&perPage=50');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const items = (data.items || []).reverse();
+                items.forEach(r => appendTranscript(r.role, r.text, r.created));
+            } catch(e) { console.warn('[Live Comms] Could not load history:', e); }
+        }
+
+        function initSSE() {
+            const statusEl = document.getElementById('sse-status');
+            const sse = new EventSource('http://127.0.0.1:8090/api/realtime');
+
+            sse.addEventListener('PB_CONNECT', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    const clientId = data.clientId;
+                    statusEl.innerHTML = '<span class="text-green-400">● LIVE</span>';
+
+                    // Subscribe to the transcripts collection
+                    fetch('http://127.0.0.1:8090/api/realtime', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ clientId: clientId, subscriptions: ['transcripts'] })
+                    });
+                } catch(err) { console.error('[SSE] Connect parse error:', err); }
+            });
+
+            sse.addEventListener('transcripts', (e) => {
+                try {
+                    const payload = JSON.parse(e.data);
+                    if (payload.action === 'create' && payload.record) {
+                        const r = payload.record;
+                        appendTranscript(r.role || 'Codex', r.text || '', r.created);
+                    }
+                } catch(err) { console.error('[SSE] Transcript parse error:', err); }
+            });
+
+            sse.onerror = () => {
+                statusEl.innerHTML = '<span class="text-red-500">● DISCONNECTED</span>';
+            };
+        }
+
         initDashboard = async () => {
             try {
                 await pb.collection('transcripts').getList(1, 1);
                 document.getElementById('connection-status').innerHTML = `<span class="text-green-400">● Bus Connected</span>`;
+                await loadRecentTranscripts();
+                initSSE();
             } catch (e) {
                 document.getElementById('connection-status').innerHTML = `<span class="text-red-500">● Offline</span>`;
+                document.getElementById('sse-status').innerHTML = '<span class="text-red-500">OFFLINE</span>';
             }
         };
 
