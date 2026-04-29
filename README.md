@@ -75,4 +75,4 @@ OpenAI's Whisper model hallucinates aggressively when fed pure room static (ofte
 
 This repository is an ongoing exploration of edge computing, model optimization, and autonomous agent orchestration. It proves that with enough patience, a solid understanding of memory mapping, and a willingness to break a few abstraction layers, you can squeeze modern AI performance out of "outdated" silicon. 
 
-If you are a recruiter or an engineering manager reading this: **I build systems that work, no matter what the documentation says is "impossible."**
+**Here's to building systems that work, no matter what the documentation says is "impossible."**
