@@ -52,6 +52,22 @@ def extract_existing_urls_from_markdown(md_path):
                 urls.add(match.group(1).strip())
     return urls
 
+def detect_table_columns(md_path):
+    """Read the seed list and detect the column headers from the first Markdown table found."""
+    default_cols = ["Source Name", "Verified Native URL", "Data Format", "Relevance"]
+    if not os.path.exists(md_path):
+        return default_cols
+    with open(md_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            stripped = line.strip()
+            # Find the first line that looks like a table header row (contains pipes and letters)
+            if stripped.startswith('|') and not stripped.startswith('| :') and not stripped.startswith('|--'):
+                # Split by pipe, strip whitespace, filter empty strings
+                cols = [c.strip() for c in stripped.split('|') if c.strip()]
+                if len(cols) >= 2:
+                    return cols
+    return default_cols
+
 def optimize_pipeline():
     log_action("\n" + "="*50)
     log_action("[AGENT 7] Booting Evolutionary Historian...")
@@ -147,18 +163,42 @@ Return ONLY a raw JSON array of objects with "url" and "topic" keys. Example:
 
         time.sleep(4)
 
-    # --- 4. Append Discoveries as Markdown Table Rows ---
+    # --- 4. Append Discoveries as Markdown Table Rows (Structure-Aware) ---
     if new_discoveries:
+        # Detect the existing table column structure from the seed list
+        columns = detect_table_columns(SEED_LIST_PATH)
+        num_cols = len(columns)
+        log_action(f"  -> Detected {num_cols}-column table structure: {columns}")
         log_action(f"  -> Appending {len(new_discoveries)} new seed URLs to master seed list...")
+
         with open(SEED_LIST_PATH, 'a', encoding='utf-8') as f:
+            # Enforce leading newline to prevent corrupting the last line of existing content
             f.write("\n\n<!-- === AGENT 7 AUTO-DISCOVERED FEEDS === -->\n")
             f.write(f"<!-- Discovery Date: {time.strftime('%Y-%m-%d %H:%M:%S')} -->\n")
-            f.write("| Source Name | URL | Topic | Status |\n")
-            f.write("|---|---|---|---|\n")
+
+            # Write a header row matching the detected column structure
+            header_row = "| " + " | ".join(columns) + " |\n"
+            separator_row = "| " + " | ".join([":----"] * num_cols) + " |\n"
+            f.write(header_row)
+            f.write(separator_row)
+
             for entry in new_discoveries:
+                # Sanitize pipe characters in all values to prevent table corruption
                 safe_url = entry['url'].replace('|', '%7C')
                 safe_topic = entry['topic'].replace('|', '-')
-                f.write(f"| Auto-Discovered | [{safe_url}]({safe_url}) | {safe_topic} | NEW |\n")
+
+                # Build the row to match the detected column count exactly
+                if num_cols == 4:
+                    # Matches: | Source Name | Verified Native URL | Data Format | Relevance |
+                    data_format = "XML" if any(ext in safe_url.lower() for ext in ['.xml', '/feed', '/rss', '.atom', '.rss']) else "JSON"
+                    row = f"| Auto-Discovered | [{safe_url}]({safe_url}) | {data_format} | {safe_topic} |\n"
+                elif num_cols == 3:
+                    row = f"| Auto-Discovered | [{safe_url}]({safe_url}) | {safe_topic} |\n"
+                else:
+                    # Fallback: 2-column or unknown — just use Source + URL
+                    row = f"| Auto-Discovered | [{safe_url}]({safe_url}) |" + " |" * max(0, num_cols - 2) + "\n"
+
+                f.write(row)
                 log_action(f"     [NEW SEED] {entry['url'][:60]}")
     else:
         log_action("  -> No new unique feeds discovered this cycle.")

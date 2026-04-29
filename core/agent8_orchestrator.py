@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import time
+import socket
 import subprocess
 import tempfile
 from pathlib import Path
@@ -31,6 +32,49 @@ def log_action(message):
 
 
 # =============================================================================
+# PHASE 0: ENVIRONMENT BINDING & INFRASTRUCTURE CHECKS
+# =============================================================================
+def resolve_python_executable():
+    """Resolve the correct Python binary: prefer local .venv, fallback to sys.executable."""
+    venv_python = BASE_DIR / '.venv' / 'Scripts' / 'python.exe'
+    if venv_python.exists():
+        log_action(f"[ENV] Local .venv detected: {venv_python}")
+        return str(venv_python)
+    else:
+        log_action(f"[ENV] No local .venv found. Using sys.executable: {sys.executable}")
+        return sys.executable
+
+def check_and_start_pocketbase():
+    """Ensure PocketBase is running on port 8090 before the pipeline starts."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.settimeout(2)
+        sock.connect(('127.0.0.1', 8090))
+        sock.close()
+        log_action("[INFRA] PocketBase is already running on port 8090.")
+        return
+    except (ConnectionRefusedError, OSError, socket.timeout):
+        sock.close()
+
+    pb_exe = BASE_DIR / 'bus' / 'pocketbase' / 'pocketbase.exe'
+    if not pb_exe.exists():
+        log_action(f"[WARNING] PocketBase executable not found at: {pb_exe}")
+        log_action("[WARNING] Skipping auto-boot. Pipeline may fail on DB writes.")
+        return
+
+    log_action("[INFRA] PocketBase was down. Auto-booting...")
+    subprocess.Popen(
+        [str(pb_exe), 'serve'],
+        cwd=str(pb_exe.parent),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
+    )
+    time.sleep(3)
+    log_action("[INFRA] PocketBase boot sequence complete. Proceeding.")
+
+
+# =============================================================================
 # PHASE 1: SEQUENTIAL AGENT PIPELINE
 # =============================================================================
 AGENT_CHAIN = [
@@ -44,15 +88,18 @@ AGENT_CHAIN = [
 
 def run_agent_chain():
     """Execute each agent sequentially. Halt on first failure."""
+    python_exe = resolve_python_executable()
+
     log_action("\n" + "="*60)
     log_action("[ORCHESTRATOR] Initiating Sequential Agent Pipeline...")
+    log_action(f"[ORCHESTRATOR] Python Executable: {python_exe}")
 
     for agent_name, agent_path in AGENT_CHAIN:
         log_action(f"\n--- Executing: {agent_name} ---")
         start = time.time()
 
         result = subprocess.run(
-            [sys.executable, agent_path],
+            [python_exe, agent_path],
             capture_output=True,
             text=True,
             cwd=str(BASE_DIR)
@@ -240,6 +287,9 @@ def main():
     log_action("\n" + "#"*60)
     log_action(f"[ORCHESTRATOR] DSIE Codex Pipeline - {time.strftime('%Y-%m-%d %H:%M:%S')}")
     log_action("#"*60)
+
+    # Phase 0: Infrastructure checks
+    check_and_start_pocketbase()
 
     # Phase 1: Run the agent chain
     pipeline_ok = run_agent_chain()
