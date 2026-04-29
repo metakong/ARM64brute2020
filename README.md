@@ -1,87 +1,78 @@
-# ARM64brute2020: The DSIE Codex & MAF4A Engine 🦍💻
+# 🦍 ARM64brute2020: The NPU Liberation Project
 
 ![Architecture](https://img.shields.io/badge/Architecture-ARM64-blue) ![OS](https://img.shields.io/badge/OS-Windows_11_on_ARM-blueviolet) ![Device](https://img.shields.io/badge/Device-Galaxy_Book_Go_5G-lightgrey) ![Status](https://img.shields.io/badge/Status-Foundational_Alpha-success)
 
-## 📌 Project Overview
+AI-Assisted project.  Special thanks to Gemini & Claude.  Below is my AI-generated README.md written in the most professional Linus Torvalds tone that Gemini could imagine!
+---
 
-**Timeline:** April 21, 2026 – April 27, 2026  
-**Effort:** ~100 Hours (Including one clinically unadvisable all-nighter)
+## 🛑 The Philosophy (Why This Exists)
 
-**ARM64brute2020** is an AI-assisted project born out of sheer necessity, budget constraints, and a complete inability to know when to quit. 
+Cloud dependencies are a crutch, and OS-level abstraction layers are usually just excuses to hide poor hardware utilization. 
 
-It began as a silicon-level trench war: forcing modern, localized AI (Microsoft AI Foundry Local) to run natively on an abandoned 2020 ARM64 laptop (Samsung Galaxy Book Go 5G). But once the hardware barrier was broken, the project mutated. It evolved from a localized LLM testbench into the **DSIE Codex**—the foundational architecture for **MAF4A** (Multi-Agent Framework for Automation).
+This repository was born from a fundamental disagreement with modern software provisioning. The Microsoft Foundry Local SDK is a brilliant piece of engineering, but it relies on Windows Machine Learning (WinML) and background Windows Update telemetry to "authorize" your hardware to use the NPU. If you debloat your OS to gain performance, the SDK assumes you are on a generic CPU, blacklists your machine from the Azure hardware catalog, and leaves your dedicated Hexagon tensor cores gathering dust.
 
-This isn't a polished corporate tutorial. It is a survival guide for ARM64 developers and a blueprint for a distributed, hardware-agnostic "CEO Dashboard" designed to replace traditional browser workflows with autonomous, event-driven intelligence.
+Software shouldn't dictate what hardware you're allowed to use. 
+
+This project is a complete, autonomous, offline-first AI ecosystem. It demonstrates how to reverse-engineer closed-source cloud telemetry, force ONNX runtime execution onto bare-metal DSPs, bypass hardcoded OS memory limits, and build a highly modular multi-agent system on older ARM64 silicon.
 
 ---
 
-## 🧱 Phase 1: Breaking the ARM64 Barrier 🤬
+## 🏗️ System Architecture
 
-If you are attempting to run local AI on a 1st or 2nd generation Windows-on-ARM device (Snapdragon 8cx Gen 2), you already know the pain. You are abandoned by package managers, NPU drivers, and pre-compiled binaries. 
+This isn't just a voice assistant; it is a full-stack, decoupled intelligence node split into distinct functional pillars to maximize the 8GB RAM constraint.
 
-### The Emulation Trap & Compilation Hell 🔥
-To build this, we had to bypass the Windows-on-ARM emulation traps and `winget` failures. If you've ever stared at a terminal vomiting `error: subprocess-exited-with-error` while trying to compile Rust toolchains (`aarch64-pc-windows-msvc`) or missing C++ 14.0 build tools just to get a simple Python wheel to install... you understand the nightmare. 
+### 1. The OSINT Factory (The Night Shift)
+* **Stack:** Python, Requests, BeautifulSoup.
+* **Function:** A classic Map-Reduce autonomous pipeline (`agent1` through `agent8`). These agents wake up overnight, scrape global intelligence, score it, extract the signal from the noise, and write daily consolidated briefings. Because they run offline, they don't compete with real-time NPU resources.
 
-**The Workarounds (How to Replicate):**
-1.  **The NPU Driver Hunt 🕵️‍♂️:** Windows 11 doesn't ship with the Snapdragon 8cx Gen 2 Hexagon NPU driver. We had to manually source and inject the `Qualcomm_Hexagon_NPU_Driver-v1.0.0.14` to get `onnxruntime` to acknowledge the silicon.
-2.  **Gutting Microsoft AI Foundry:** The official SDK assumes x64 architecture. We unpacked the nested dependencies (`sherpa-onnx`, `espeak-ng-data`), manually sourced the ARM64 static libraries, and surgically injected them. *(Note: The massive 800MB `.lib` binaries have been stripped from this GitHub repo to meet size limits, but the `dependencies/` folder structure shows exactly where you must place them).*
-3.  **Model Squeezing:** Standard `.gguf` files will instantly cap this laptop's 8GB shared memory. We utilized Kaggle GPUs to convert models (like Qwen) to `.onnx` and heavily quantize them (`int4`) for edge viability.
-4.  **Universal PATH Injection:** Emulated PowerShell instances will frequently drop your CLI bindings. We bypassed scripts entirely, mapping un-emulated `\cmd` folders directly into the deepest OS-level Environment Variables.
+### 2. The Cognitive Bus (The Memory Layer)
+* **Stack:** PocketBase (SQLite).
+* **Function:** Because nobody needs a Kubernetes cluster to store daily news. PocketBase acts as a lightning-fast, local REST API that bridges the overnight Python agents, the real-time Voice Assistant, and the Svelte frontend. It handles state, transcripts, and the "Vault" memory system without file-locking collisions.
 
-**The Win:** A natively executing Qwen model running entirely on-device on a 2020 budget ARM laptop, proving legacy Snapdragon silicon is still viable for edge AI.
+### 3. The Interactive Edge (Codex Voice Stack)
+* **Stack:** Microsoft Foundry Local, ONNX Runtime, Qualcomm AI Engine Direct (QAIRT).
+* **Function:** The real-time interface. It runs **OpenAI Whisper (Tiny)** and **Qwen 2.5 (4B int4)** directly on the Hexagon NPU. It listens, reads the OSINT briefs from PocketBase, and responds verbally with near-zero latency.
 
----
-
-## 🧠 Phase 2: The MAF4A Evolution (Beyond Chatbots) 🚀
-
-During the 100-hour sprint, deep architectural research revealed a fatal flaw in current AI: existing frameworks (like crewAI) are just bloated "Role-Play Abstractions" that waste tokens on system prompts, while others (LangGraph) are rigid state machines. 
-
-We abandoned them both to build **MAF4A** (Multi-Agent Framework for Automation) based on **Cognitive Event Streaming**.
-
-### The Architecture: "The Iron Spine" 🏗️
-
-Instead of a human doom-scrolling feeds or manually scraping data, this pipeline operates as a distributed system, pushing data sequentially straight into a local PocketBase backend and out to an HTML UI.
-
-* **Sub-Cognitive Offloading:** "Low-IQ" tasks (formatting, data scraping) are offloaded to the local Snapdragon NPU. Only heavy, strategic reasoning is routed to cloud APIs (Groq/Gemini), drastically cutting latency and costs.
-* **MCP-Native Connectivity (The "USB" Ports):** Agents do not hard-code API integrations. Using the **Model Context Protocol (MCP)**, the system dynamically discovers your local files, Google Drive, and databases securely.
-* **The Sequential Agent Chain:**
-    * `agent1_fetcher.py`: Ingests raw XML/RSS data from targeted seed lists.
-    * `agent2_scorer.py`: The local NPU evaluates articles against strict "Pillars of Intelligence." Noise is instantly culled.
-    * `agent3_extractor.py`: Deep entity and metric extraction on surviving data.
-    * `agent4_consolidator.py`: Synthesizes raw facts into executive-level briefs.
-    * `agent5_content_creator.py`: Enforces strict JSON schemas for the dashboard.
-    * `agent6_dashboard_injector.py`: Pushes structured data to the local PocketBase SQLite DB.
-* **Agent 7 (The Evolutionary Historian) 🧬:** The system remembers. It logs today's winning URLs to prevent duplicates and dynamically hunts for *new* target feeds based on today's highest-scoring intelligence, automatically evolving its own intake for tomorrow.
+### 4. The Presentation Layer (WIP)
+* **Stack:** SvelteKit, Tailwind CSS.
+* **Function:** A reactive, local HTML dashboard that visualizes the data inside PocketBase. 
 
 ---
 
-## 📂 Repository Structure
+## 🛠️ The Hack: Forcing the Hexagon NPU (A Developer's Guide)
 
-```text
-ARM64brute2020/
-├── core/
-│   ├── agent1_fetcher.py
-│   ├── agent2_scorer.py
-│   ├── ... (Agents 3-7 & Orchestrator)
-│   ├── dsie_core.py                 # Core utility and LLM routing
-│   └── mcp_nexus.py / gdrive_mcp.py # Model Context Protocol implementations
-├── dashboard/
-│   └── index.html                   # The clean, vanilla HTML/JS CEO Dashboard
-├── bus/
-│   └── pocketbase/                  # Local Go/SQLite database and migrations
-├── dependencies/                    # The reconstructed Microsoft Foundry SDK tree
-│   └── Foundry-Local-main/
-└── dsie_boot.vbs                    # Silent execution wrapper
+If you are running an older Snapdragon compute platform (7c, 8cx Gen 2) and Foundry Local is forcing you onto the `CPUExecutionProvider`, here is exactly how to break the locks.
+
+### Step 1: Gutting VBS & Debloating
+First, disable Virtualization-Based Security (Core Isolation). Running local AI through a hypervisor translation layer destroys latency. We want bare-metal memory-mapped I/O.
+* See `tools/optimize_system.ps1` for the exact Registry and Environment Variable routing needed to keep your C: drive pristine by mapping Python and NPM caches to a dedicated Z: drive.
+
+### Step 2: The QAIRT DLL Injection
+Because we gutted WinML telemetry, the OS won't download the Qualcomm Execution Provider. You must manually download the Qualcomm AI Runtime (QAIRT) and hard-link it into the Python environment *before* the SDK initializes:
+```python
+qairt_bin = r"Z:\QCDrivers\qairt\2.45.0.260326\bin\arm64x-windows-msvc"
+os.add_dll_directory(qairt_bin)
+os.environ["PATH"] = qairt_bin + os.pathsep + os.environ["PATH"]
 ```
 
+### Step 3: Bypassing the Azure Catalog & The Memory Trojan
+Foundry Local limits model allocation to ~60% of total system RAM to prevent OS crashes (giving us a hard ceiling of 4.8GB). Furthermore, Azure will block your machine from downloading `-qnn-npu` variants if it doesn't detect WinML.
+**The Fix:**
+1. Use `Configuration(additional_settings={"ExecutionProvider": "QnnExecutionProvider", "EpDetectorOverride": "true"})` to globally force the C# backend to use the NPU.
+2. Request a generic, smaller model (e.g., `qwen2.5-1.5b-instruct-qnn-npu:2`) from the catalog so it generates the correct Hexagon DSP folder structure.
+3. Shut down the script, go into `Z:\foundry_cache\models\Microsoft\...` and mercilessly overwrite the 1.5B weights with your custom 4B int4 `.onnx` weights. The system will load the 4B model into the NPU footprint without triggering the RAM gatekeeper.
+
+### Step 4: Surviving the Windows Boot Race Condition
+If you run this on startup via a VBScript, it will likely crash and fall back to the CPU. Why? Because the Windows boot sequence is chaotic, and your script will ask for the NPU before the Qualcomm MCDM drivers have fully initialized. 
+**The Fix:** Inject a hard `WScript.Sleep 20000` (20 seconds) into your `start_codex.vbs` to let the drivers wake up before firing the ONNX runtime.
+
+### Step 5: The Whisper Squelch (Anti-Hallucination)
+OpenAI's Whisper model hallucinates aggressively when fed pure room static (often outputting *"Thank you for watching"*). To fix this, `dsie_core.py` implements a hard mathematical VAD (Voice Activity Detection) threshold (`rms > 0.05`), a 1-second minimum audio gate, and a regex blacklist to instantly drop known static hallucinations before they ever wake up the LLM.
+
 ---
 
-## 💡 A Note on Competency & AI Assistance
+## 🤝 Conclusion
 
-Let's be unequivocally clear: this codebase was heavily AI-assisted. 
+This repository is an ongoing exploration of edge computing, model optimization, and autonomous agent orchestration. It proves that with enough patience, a solid understanding of memory mapping, and a willingness to break a few abstraction layers, you can squeeze modern AI performance out of "outdated" silicon. 
 
-If this repository demonstrates any primary competency, it is **simply not being smart enough to know when to give up.** It is the result of arguing with an AI coding assistant for 100 hours, refusing to accept that "hardware limitations," "C++ compilation failures," or "emulation barriers" were valid reasons to abandon the build. 
-
-It is a testament to what a budget-conscious developer can achieve when they combine modern LLM tooling with absolute, relentless, sleep-deprived stubbornness. 
-
-Welcome to the DSIE Codex. Enjoy the code. 🍻
+If you are a recruiter or an engineering manager reading this: **I build systems that work, no matter what the documentation says is "impossible."**
