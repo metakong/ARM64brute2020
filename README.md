@@ -62,9 +62,29 @@ Foundry Local limits model allocation to ~60% of total system RAM to prevent OS 
 2. Request a generic, smaller model (e.g., `qwen2.5-1.5b-instruct-qnn-npu:2`) from the catalog so it generates the correct Hexagon DSP folder structure.
 3. Shut down the script, go into `Z:\foundry_cache\models\Microsoft\...` and mercilessly overwrite the 1.5B weights with your custom 4B int4 `.onnx` weights. The system will load the 4B model into the NPU footprint without triggering the RAM gatekeeper.
 
-### Step 4: Surviving the Windows Boot Race Condition
-If you run this on startup via a VBScript, it will likely crash and fall back to the CPU. Why? Because the Windows boot sequence is chaotic, and your script will ask for the NPU before the Qualcomm MCDM drivers have fully initialized. 
-**The Fix:** Inject a hard `WScript.Sleep 20000` (20 seconds) into your `start_codex.vbs` to let the drivers wake up before firing the ONNX runtime.
+### Step 4: The Dev Drive Mount Race & Task Scheduler Ignition
+If you are using a Windows "Dev Drive" (VHDX/ReFS) to store your environment, standard Startup Folders and VBScripts will fail silently. The OS will attempt to spawn the command shell before the Virtual Disk Service mounts the drive. Because our global %TEMP% variable points to the Dev Drive, the shell crashes instantly upon launch.
+
+The Fix: 
+1. Abandon the shell:startup folder.
+2. Create a "Bootstrapper" batch file on your primary C: drive that forces a local temp environment, polls for the Dev Drive to mount, and then hands execution to the NPU:
+
+```batch
+@echo off
+:: Force local temp to C: to prevent CMD crash if Z: is unmounted
+set TEMP=C:\Windows\Temp
+set TMP=C:\Windows\Temp
+:POLL
+if not exist "Z:\foundry_project\core\dsie_core.py" (
+    timeout /t 2 /nobreak > nul
+    goto POLL
+)
+cd /d "Z:\foundry_project"
+start "" "Z:\foundry_project\venv\Scripts\python.exe" "core\dsie_core.py"
+```
+
+Use the Windows Task Scheduler to trigger this script At log on with a 30-second delay, ensuring it runs with "Run only when user is logged on" to utilize the Interactive Admin Token (bypassing SeBatchLogonRight restrictions and allowing hardware mapping).
+
 
 ### Step 5: The Whisper Squelch (Anti-Hallucination)
 OpenAI's Whisper model hallucinates aggressively when fed pure room static (often outputting *"Thank you for watching"*). To fix this, `dsie_core.py` implements a hard mathematical VAD (Voice Activity Detection) threshold (`rms > 0.05`), a 1-second minimum audio gate, and a regex blacklist to instantly drop known static hallucinations before they ever wake up the LLM.
