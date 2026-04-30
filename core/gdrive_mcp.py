@@ -1,12 +1,13 @@
 import os
 import sys
+from pathlib import Path
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
 
-# Force load from absolute path
-dotenv_path = r'C:\foundry_project\.env'
+# Force load from project root (relative to this script)
+dotenv_path = str(Path(__file__).resolve().parent.parent / '.env')
 load_dotenv(dotenv_path=dotenv_path)
 
 SERVICE_ACCOUNT_FILE = os.getenv('GCP_SERVICE_KEY')

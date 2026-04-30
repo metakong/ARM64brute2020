@@ -36,7 +36,7 @@ def log_action(message):
 # =============================================================================
 def resolve_python_executable():
     """Resolve the correct Python binary: prefer local .venv, fallback to sys.executable."""
-    venv_python = BASE_DIR / '.venv' / 'Scripts' / 'python.exe'
+    venv_python = BASE_DIR / 'venv' / 'Scripts' / 'python.exe'
     if venv_python.exists():
         log_action(f"[ENV] Local .venv detected: {venv_python}")
         return str(venv_python)

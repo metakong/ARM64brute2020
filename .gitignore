@@ -18,6 +18,7 @@ organizer_log.txt
 dashboard/*.json
 dashboard/OSINT_System_State/
 organizer_state.json
+bus/pocketbase/pb_data/
 
 # Secrets & Credentials (CRITICAL)
 .env

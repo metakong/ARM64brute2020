@@ -14,15 +14,16 @@ from google.genai import types
 from dotenv import load_dotenv
 
 # --- CONFIGURATION ---
-load_dotenv(r'C:\foundry_project\.env')
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(str(BASE_DIR / '.env'))
 GEMINI_API_KEY = os.getenv('GOOGLE_API_KEY')
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 SCOPES = ['https://www.googleapis.com/auth/drive']
-CLIENT_SECRET_FILE = r'C:\foundry_project\client_secret.json'
-TOKEN_FILE = r'C:\foundry_project\token.json'
-STATE_FILE = r'C:\foundry_project\organizer_state.json'
-LOG_FILE = r'C:\foundry_project\organizer_log.txt'
+CLIENT_SECRET_FILE = str(BASE_DIR / 'client_secret.json')
+TOKEN_FILE = str(BASE_DIR / 'token.json')
+STATE_FILE = str(BASE_DIR / 'organizer_state.json')
+LOG_FILE = str(BASE_DIR / 'organizer_log.txt')
 BATCH_SIZE = 100
 
 def log_action(message):

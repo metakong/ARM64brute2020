@@ -17,7 +17,7 @@ async def connect_to_mcps():
     # Define parameters for ALL 3 servers
     fs_params = StdioServerParameters(
         command=NPX_PATH,
-        args=["-y", "@modelcontextprotocol/server-filesystem", r"C:\foundry_project", r"C:\DSIE_Vault"],
+        args=["-y", "@modelcontextprotocol/server-filesystem", r"Z:\foundry_project", r"C:\DSIE_Vault"],
         env=mcp_env
     )
 
@@ -29,7 +29,7 @@ async def connect_to_mcps():
 
     gdrive_params = StdioServerParameters(
         command=PYTHON_PATH,
-        args=[r"C:\foundry_project\core\gdrive_mcp.py"]
+        args=[r"Z:\foundry_project\core\gdrive_mcp.py"]
     )
 
     # --- Testing Filesystem ---
