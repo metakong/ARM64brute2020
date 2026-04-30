@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 migrate((app) => {
   const collection = new Collection({
-    "createRule": null,
+    "createRule": "",
     "deleteRule": null,
     "fields": [
       {
@@ -23,10 +23,25 @@ migrate((app) => {
         "autogeneratePattern": "",
         "help": "",
         "hidden": false,
-        "id": "text2072370017",
+        "id": "text_role_field",
         "max": 0,
         "min": 0,
-        "name": "speaker",
+        "name": "role",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": false,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "autogeneratePattern": "",
+        "help": "",
+        "hidden": false,
+        "id": "text_content_field",
+        "max": 0,
+        "min": 0,
+        "name": "text",
         "pattern": "",
         "presentable": false,
         "primaryKey": false,
@@ -57,12 +72,12 @@ migrate((app) => {
     ],
     "id": "pbc_3912927586",
     "indexes": [],
-    "listRule": null,
+    "listRule": "",
     "name": "transcripts",
     "system": false,
     "type": "base",
     "updateRule": null,
-    "viewRule": null
+    "viewRule": ""
   });
 
   return app.save(collection);

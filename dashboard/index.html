@@ -35,10 +35,11 @@
     <main class="flex-1 overflow-hidden relative">
         <div id="view-bus" class="absolute inset-0 flex p-6 space-x-6 transition-opacity duration-300">
             <section class="flex-1 flex flex-col bg-gray-800 rounded-lg border border-gray-700 shadow-xl overflow-hidden">
-                <div class="p-3 border-b border-gray-700 bg-gray-800/50">
-                    <h2 class="text-xs uppercase tracking-widest text-gray-400 font-semibold">Live Transcription Feed</h2>
+                <div class="p-3 border-b border-gray-700 bg-gray-800/50 flex justify-between items-center">
+                    <h2 class="text-xs uppercase tracking-widest text-gray-400 font-semibold">Live Comms</h2>
+                    <span id="sse-status" class="text-[10px] text-gray-500 uppercase">Connecting...</span>
                 </div>
-                <div id="feed-container" class="flex-1 overflow-y-auto p-6 space-y-6"></div>
+                <div id="feed-container" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
             </section>
             <aside class="w-80 flex flex-col space-y-6">
                 <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-5">
@@ -91,13 +92,15 @@
             <aside class="w-80 flex flex-col space-y-6">
                 <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-5">
                     <h2 class="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-4">Master Synapse Router</h2>
-                    <label class="block text-xs text-gray-500 mb-1">Target Provider & Model</label>
+                    <label class="block text-xs text-gray-500 mb-1">Target Provider &amp; Model</label>
                     <select id="model-select" class="w-full bg-gray-900 border border-gray-600 rounded text-xs p-2 text-gray-100 focus:outline-none mb-4"></select>
+                    <label class="block text-xs text-gray-500 mb-1 mt-2">Model Override (optional)</label>
+                    <input id="model-override" type="text" class="w-full bg-gray-900 border border-gray-600 rounded text-xs p-2 text-gray-100 focus:outline-none" placeholder="Leave blank for default">
                 </div>
                 <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-xl p-5 flex-1 flex flex-col overflow-hidden">
-                    <h2 class="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-2">API Keychains</h2>
-                    <div id="keychain-container" class="space-y-3 overflow-y-auto pr-2 flex-1"></div>
-                    <button id="save-keys" class="w-full bg-gray-700 hover:bg-gray-600 text-xs py-2 rounded mt-4 transition-colors">Save Keys Locally</button>
+                    <h2 class="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-2">Router Status</h2>
+                    <div id="router-status" class="text-xs text-gray-500 mt-2">Checking...</div>
+                    <div id="provider-count" class="text-xs text-gray-500 mt-1"></div>
                 </div>
             </aside>
         </div>
@@ -197,13 +200,253 @@
 
         function closeReader() { document.getElementById('article-reader').classList.add('hidden'); }
 
+        // --- LIVE COMMS: SSE REALTIME ENGINE ---
+        function appendTranscript(role, text, timestamp) {
+            const container = document.getElementById('feed-container');
+            const bubble = document.createElement('div');
+            const isCEO = role === 'CEO';
+            const timeStr = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+
+            bubble.className = `flex flex-col ${isCEO ? 'items-end' : 'items-start'} animate-fade-in`;
+            bubble.innerHTML = `
+                <div class="text-[10px] text-gray-500 mb-1 ${isCEO ? 'text-right' : 'text-left'} tracking-wider">
+                    ${isCEO ? 'CEO' : 'CODEX'} &middot; ${timeStr}
+                </div>
+                <div class="max-w-[80%] px-4 py-3 rounded-lg text-sm leading-relaxed ${
+                    isCEO
+                        ? 'bg-blue-900/40 border border-blue-700/50 text-blue-100'
+                        : 'bg-green-900/40 border border-green-700/50 text-green-100'
+                } shadow-lg">
+                    ${text}
+                </div>
+            `;
+            container.appendChild(bubble);
+            container.scrollTop = container.scrollHeight;
+
+            // Update Qwen badge activity
+            if (!isCEO) {
+                const badge = document.getElementById('qwen-badge');
+                badge.innerText = 'ACTIVE';
+                badge.className = 'text-xs bg-green-900 text-green-400 px-2 py-1 rounded border border-green-700';
+                setTimeout(() => {
+                    badge.innerText = 'WAITING';
+                    badge.className = 'text-xs bg-gray-900 text-gray-500 px-2 py-1 rounded border border-gray-700';
+                }, 3000);
+            }
+        }
+
+        async function loadRecentTranscripts() {
+            try {
+                const resp = await fetch('http://127.0.0.1:8090/api/collections/transcripts/records?sort=-created&perPage=50');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const items = (data.items || []).reverse();
+                items.forEach(r => appendTranscript(r.role, r.text, r.created));
+            } catch(e) { console.warn('[Live Comms] Could not load history:', e); }
+        }
+
+        function initSSE() {
+            const statusEl = document.getElementById('sse-status');
+            const sse = new EventSource('http://127.0.0.1:8090/api/realtime');
+
+            sse.addEventListener('PB_CONNECT', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    const clientId = data.clientId;
+                    statusEl.innerHTML = '<span class="text-green-400">● LIVE</span>';
+
+                    // Subscribe to the transcripts collection
+                    fetch('http://127.0.0.1:8090/api/realtime', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ clientId: clientId, subscriptions: ['transcripts'] })
+                    });
+                } catch(err) { console.error('[SSE] Connect parse error:', err); }
+            });
+
+            sse.addEventListener('transcripts', (e) => {
+                try {
+                    const payload = JSON.parse(e.data);
+                    if (payload.action === 'create' && payload.record) {
+                        const r = payload.record;
+                        appendTranscript(r.role || 'Codex', r.text || '', r.created);
+                    }
+                } catch(err) { console.error('[SSE] Transcript parse error:', err); }
+            });
+
+            sse.onerror = () => {
+                statusEl.innerHTML = '<span class="text-red-500">● DISCONNECTED</span>';
+            };
+        }
+
+        // =================================================================
+        // MERCENARY TERMINAL ENGINE
+        // =================================================================
+        const MERC_API = 'http://127.0.0.1:8000';
+        let mercConversation = [];
+        let mercProviders = [];
+
+        function appendMercMessage(role, text) {
+            const container = document.getElementById('merc-chat-container');
+            const bubble = document.createElement('div');
+            const isUser = role === 'user';
+            const timeStr = new Date().toLocaleTimeString();
+
+            bubble.className = `flex flex-col ${isUser ? 'items-end' : 'items-start'}`;
+            bubble.innerHTML = `
+                <div class="text-[10px] text-gray-500 mb-1 ${isUser ? 'text-right' : 'text-left'} tracking-wider">
+                    ${isUser ? 'YOU' : 'MERCENARY'} &middot; ${timeStr}
+                </div>
+                <div class="max-w-[85%] px-4 py-3 rounded-lg text-sm leading-relaxed ${
+                    isUser
+                        ? 'bg-blue-900/40 border border-blue-700/50 text-blue-100'
+                        : 'bg-emerald-900/30 border border-emerald-700/50 text-emerald-100'
+                } shadow-lg whitespace-pre-wrap">
+                    ${text}
+                </div>
+            `;
+            container.appendChild(bubble);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function loadProviders() {
+            const select = document.getElementById('model-select');
+            const statusEl = document.getElementById('router-status');
+            const countEl = document.getElementById('provider-count');
+            const modelDisplay = document.getElementById('active-model-display');
+
+            try {
+                const resp = await fetch(`${MERC_API}/providers`);
+                if (!resp.ok) throw new Error('Router offline');
+                const data = await resp.json();
+                mercProviders = data.providers || [];
+
+                select.innerHTML = '';
+                const activeProviders = mercProviders.filter(p => p.active);
+
+                activeProviders.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = JSON.stringify({ provider: p.provider, model: p.default_model });
+                    opt.textContent = `${p.provider} — ${p.default_model}`;
+                    select.appendChild(opt);
+                });
+
+                statusEl.innerHTML = '<span class="text-green-400">● Router Online</span>';
+                countEl.textContent = `${activeProviders.length}/${mercProviders.length} providers active`;
+
+                // Update header display with selected model
+                if (activeProviders.length > 0) {
+                    const first = activeProviders[0];
+                    modelDisplay.textContent = `${first.provider} — ${first.default_model}`;
+                }
+
+                select.addEventListener('change', () => {
+                    try {
+                        const val = JSON.parse(select.value);
+                        modelDisplay.textContent = `${val.provider} — ${val.model}`;
+                    } catch(e) {}
+                });
+
+            } catch (err) {
+                statusEl.innerHTML = '<span class="text-red-500">● Router Offline</span>';
+                countEl.textContent = 'Start mercenary_router.py on port 8000';
+                select.innerHTML = '<option disabled selected>No providers available</option>';
+            }
+        }
+
+        async function executeMercenary() {
+            const input = document.getElementById('merc-input');
+            const sendBtn = document.getElementById('merc-send');
+            const select = document.getElementById('model-select');
+            const overrideInput = document.getElementById('model-override');
+            const userText = input.value.trim();
+
+            if (!userText || !select.value) return;
+
+            // Parse selected provider
+            let selected;
+            try {
+                selected = JSON.parse(select.value);
+            } catch(e) {
+                appendMercMessage('system', '[ERROR] No valid provider selected.');
+                return;
+            }
+
+            // Allow model override
+            const modelOverride = overrideInput ? overrideInput.value.trim() : '';
+            const targetModel = modelOverride || selected.model;
+
+            // Show user message
+            appendMercMessage('user', userText);
+            input.value = '';
+
+            // Add to conversation history
+            mercConversation.push({ role: 'user', content: userText });
+
+            // Disable button during request
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'ROUTING...';
+            sendBtn.className = 'bg-gray-600 text-gray-400 px-6 rounded font-semibold cursor-wait';
+
+            try {
+                const resp = await fetch(`${MERC_API}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        provider: selected.provider,
+                        model: targetModel,
+                        messages: mercConversation,
+                        temperature: 0.2
+                    })
+                });
+
+                if (!resp.ok) {
+                    const errData = await resp.json().catch(() => ({ detail: resp.statusText }));
+                    throw new Error(errData.detail || `HTTP ${resp.status}`);
+                }
+
+                const data = await resp.json();
+                const reply = data.choices?.[0]?.message?.content || '[No response content]';
+
+                mercConversation.push({ role: 'assistant', content: reply });
+                appendMercMessage('assistant', reply);
+
+            } catch (err) {
+                appendMercMessage('system', `[ROUTING ERROR] ${err.message}`);
+                // Remove the failed user message from conversation history
+                mercConversation.pop();
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'EXECUTE';
+                sendBtn.className = 'bg-green-600 hover:bg-green-500 text-white px-6 rounded font-semibold transition-colors';
+            }
+        }
+
+        // Wire Execute button and Enter key
+        document.getElementById('merc-send').addEventListener('click', executeMercenary);
+        document.getElementById('merc-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                executeMercenary();
+            }
+        });
+
+        // =================================================================
+        // INITIALIZATION
+        // =================================================================
         initDashboard = async () => {
             try {
                 await pb.collection('transcripts').getList(1, 1);
                 document.getElementById('connection-status').innerHTML = `<span class="text-green-400">● Bus Connected</span>`;
+                await loadRecentTranscripts();
+                initSSE();
             } catch (e) {
                 document.getElementById('connection-status').innerHTML = `<span class="text-red-500">● Offline</span>`;
+                document.getElementById('sse-status').innerHTML = '<span class="text-red-500">OFFLINE</span>';
             }
+
+            // Initialize Mercenary Terminal providers
+            await loadProviders();
         };
 
         initDashboard();

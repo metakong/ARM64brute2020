@@ -32,7 +32,12 @@ echo [BOOT] Starting Dashboard HTTP server on port 8080...
 start "" /B "Z:\foundry_project\venv\Scripts\python.exe" -m http.server 8080 --directory "Z:\foundry_project\dashboard"
 timeout /t 2 /nobreak > nul
 
-:: Phase 5: Open browser to Dashboard
+:: Phase 5: Boot the Mercenary Router (Cloud AI Gateway)
+echo [BOOT] Starting Mercenary Router on port 8000...
+start "" /B "Z:\foundry_project\venv\Scripts\python.exe" "core\mercenary_router.py"
+timeout /t 2 /nobreak > nul
+
+:: Phase 6: Open browser to Dashboard
 echo [BOOT] Opening Dashboard in browser...
 start http://localhost:8080
 

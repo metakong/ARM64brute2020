@@ -49,6 +49,44 @@ PROVIDERS = {
     "Arcee AI": {"url": "https://api.arcee.ai/v1/chat/completions", "env_key": "ARCEE_API_KEY"}
 }
 
+# Default models per provider for the dashboard dropdown
+DEFAULT_MODELS = {
+    "Cerebras Cloud": "llama-4-scout-17b-16e-instruct",
+    "GroqCloud": "llama-3.3-70b-versatile",
+    "SambaNova Cloud": "Meta-Llama-3.3-70B-Instruct",
+    "Google AI Studio": "gemini-2.5-flash",
+    "Mistral AI": "mistral-small-latest",
+    "xAI": "grok-3-mini-fast",
+    "NVIDIA NIM": "meta/llama-3.3-70b-instruct",
+    "OpenRouter": "google/gemini-2.5-flash",
+    "Cloudflare Workers AI": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "Hugging Face": "Qwen/Qwen2.5-72B-Instruct",
+    "GitHub Models": "gpt-4o-mini",
+    "Together AI": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    "Fireworks AI": "accounts/fireworks/models/llama4-scout-instruct-basic",
+    "DeepInfra": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+    "Novita AI": "meta-llama/llama-3.3-70b-instruct",
+    "Cohere": "command-a-03-2025",
+    "CometAPI": "gpt-4o-mini",
+    "Z.ai": "z1-small",
+    "Moonshot AI": "moonshot-v1-auto",
+    "OpenCode Zen": "opencode-zen",
+    "Arcee AI": "arcee-blitz",
+}
+
+@app.get("/providers")
+def list_providers():
+    """Returns all providers, their key status, and default model."""
+    result = []
+    for name, config in PROVIDERS.items():
+        has_key = bool(os.getenv(config["env_key"]))
+        result.append({
+            "provider": name,
+            "active": has_key,
+            "default_model": DEFAULT_MODELS.get(name, "default"),
+        })
+    return {"providers": result}
+
 @app.post("/chat")
 def route_chat(req: ChatRequest):
     if req.provider not in PROVIDERS:
