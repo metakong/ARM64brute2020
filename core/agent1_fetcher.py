@@ -14,6 +14,8 @@ from googleapiclient.http import MediaIoBaseDownload
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+from dsie_utils import log_action
+
 # --- CONFIGURATION ---
 SCOPES = ['https://www.googleapis.com/auth/drive']
 CLIENT_SECRET_FILE = str(BASE_DIR / 'client_secret.json')
@@ -28,11 +30,6 @@ LOG_FILE = str(BASE_DIR / 'logs' / 'agent1_fetcher_log.txt')
 # Ensure directories exist
 os.makedirs(LOCAL_STATE_DIR, exist_ok=True)
 os.makedirs(str(BASE_DIR / 'logs'), exist_ok=True)
-
-def log_action(message):
-    print(message)
-    with open(LOG_FILE, 'a', encoding='utf-8') as f:
-        f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} | {message}\n")
 
 # --- GOOGLE DRIVE AUTH & STATE MANAGEMENT ---
 def authenticate_drive():
@@ -89,10 +86,10 @@ def load_state_from_drive(drive_service, folder_id):
 
 # --- EXTRACTION & FETCHING ---
 def extract_urls_from_markdown(md_path):
-    log_action("[SYSTEM] Parsing Master Seed List for native endpoints...")
+    log_action("[SYSTEM] Parsing Master Seed List for native endpoints...", LOG_FILE)
     urls = []
     if not os.path.exists(md_path):
-        log_action(f"[FATAL] Could not find seed list at: {md_path}")
+        log_action(f"[FATAL] Could not find seed list at: {md_path}", LOG_FILE)
         return []
 
     with open(md_path, 'r', encoding='utf-8') as f:
@@ -108,7 +105,7 @@ def extract_urls_from_markdown(md_path):
                         urls.append(match_plain.group(1).strip())
                         
     unique_urls = list(set(urls))
-    log_action(f"[SUCCESS] Extracted {len(unique_urls)} valid data endpoints.")
+    log_action(f"[SUCCESS] Extracted {len(unique_urls)} valid data endpoints.", LOG_FILE)
     return unique_urls
 
 def extract_from_nested_json(data, seen_urls, source_url):
@@ -154,8 +151,8 @@ def extract_from_nested_json(data, seen_urls, source_url):
     return results
 
 def run_fetcher_agent():
-    log_action("\n" + "="*50)
-    log_action("[AGENT 1] Booting The Fetcher (Unleashed + Cloudscraper)...")
+    log_action("\n" + "="*50, LOG_FILE)
+    log_action("[AGENT 1] Booting The Fetcher (Unleashed + Cloudscraper)...", LOG_FILE)
     
     drive_service = authenticate_drive()
     folder_id = get_or_create_state_folder(drive_service)
@@ -172,7 +169,7 @@ def run_fetcher_agent():
     
     # NO SLICING. We execute all 288 endpoints.
     for url in feed_urls:
-        log_action(f"  -> Polling: {url}")
+        log_action(f"  -> Polling: {url}", LOG_FILE)
         try:
             response = scraper.get(url, timeout=15)
             response.raise_for_status()
@@ -187,17 +184,17 @@ def run_fetcher_agent():
                     if extracted:
                         morning_intake.extend(extracted)
                         for item in extracted:
-                            log_action(f"     [NEW JSON] Queued: {item['title'][:60]}...")
+                            log_action(f"     [NEW JSON] Queued: {item['title'][:60]}...", LOG_FILE)
                     else:
-                        log_action("     [SKIP] No viable article links found in JSON.")
+                        log_action("     [SKIP] No viable article links found in JSON.", LOG_FILE)
                 except ValueError:
-                    log_action("     [SKIP] Invalid JSON payload.")
+                    log_action("     [SKIP] Invalid JSON payload.", LOG_FILE)
                     
             # 2. XML / ATOM / RSS Processing
             else:
                 feed = feedparser.parse(response.content)
                 if not feed.entries:
-                    log_action("     [SKIP] No entries or invalid XML.")
+                    log_action("     [SKIP] No entries or invalid XML.", LOG_FILE)
                     continue
                     
                 for entry in feed.entries[:5]:
@@ -214,18 +211,41 @@ def run_fetcher_agent():
                         "summary_snippet": summary
                     })
                     seen_urls.add(link)
-                    log_action(f"     [NEW XML] Queued: {title[:60]}...")
+                    log_action(f"     [NEW XML] Queued: {title[:60]}...", LOG_FILE)
                     
         except Exception as e:
             # We catch and log all connection errors so a dead site doesn't crash the pipeline
-            log_action(f"     [ERROR] Connection failed: {str(e)[:100]}")
+            log_action(f"     [ERROR] Connection failed: {str(e)[:100]}", LOG_FILE)
             
     # Save the Intake Queue
     with open(INTAKE_QUEUE_PATH, 'w', encoding='utf-8') as f:
         json.dump(morning_intake, f, indent=4)
         
-    log_action(f"\n[SUCCESS] Agent 1 complete. Queued {len(morning_intake)} fresh articles for scoring.")
-    log_action(f"[SYSTEM] Handoff ready at: {INTAKE_QUEUE_PATH}")
+    state["processed_urls"] = list(seen_urls)
+    with open(LOCAL_STATE_PATH, 'w', encoding='utf-8') as f:
+        json.dump(state, f)
+    
+    # Upload updated state back to Google Drive
+    from googleapiclient.http import MediaFileUpload
+    try:
+        file_name = 'osint_state.json'
+        query = f"name='{file_name}' and '{folder_id}' in parents and trashed=false"
+        results = drive_service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+        files = results.get('files', [])
+        
+        media = MediaFileUpload(LOCAL_STATE_PATH, mimetype='application/json')
+        if files:
+            file_id = files[0]['id']
+            drive_service.files().update(fileId=file_id, media_body=media).execute()
+        else:
+            file_metadata = {'name': file_name, 'parents': [folder_id]}
+            drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        log_action("[SYSTEM] Successfully synced state back to Google Drive.", LOG_FILE)
+    except Exception as e:
+        log_action(f"[ERROR] Failed to sync state to Google Drive: {e}", LOG_FILE)
+        
+    log_action(f"\n[SUCCESS] Agent 1 complete. Queued {len(morning_intake)} fresh articles for scoring.", LOG_FILE)
+    log_action(f"[SYSTEM] Handoff ready at: {INTAKE_QUEUE_PATH}", LOG_FILE)
 
 if __name__ == "__main__":
     run_fetcher_agent()

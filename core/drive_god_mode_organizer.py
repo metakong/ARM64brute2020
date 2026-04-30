@@ -4,6 +4,7 @@ import json
 import time
 import random
 import shutil
+from pathlib import Path
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -11,7 +12,10 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google import genai
 from google.genai import types
+from google.genai import errors as genai_errors
 from dotenv import load_dotenv
+
+from dsie_utils import log_action, execute_with_backoff, clean_json_response, GEMINI_MODEL
 
 # --- CONFIGURATION ---
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,41 +27,10 @@ SCOPES = ['https://www.googleapis.com/auth/drive']
 CLIENT_SECRET_FILE = str(BASE_DIR / 'client_secret.json')
 TOKEN_FILE = str(BASE_DIR / 'token.json')
 STATE_FILE = str(BASE_DIR / 'organizer_state.json')
-LOG_FILE = str(BASE_DIR / 'organizer_log.txt')
+LOG_FILE = str(BASE_DIR / 'logs' / 'organizer_log.txt')
 BATCH_SIZE = 100
 
-def log_action(message):
-    """Prints to console and appends to the permanent text log."""
-    print(message)
-    with open(LOG_FILE, 'a', encoding='utf-8') as f:
-        f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} | {message}\n")
-
-def execute_with_backoff(func, *args, max_retries=6, **kwargs):
-    """Executes a function with exponential backoff + jitter for API limits."""
-    base_delay = 1
-    for attempt in range(max_retries):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            is_rate_limit = False
-            if isinstance(e, HttpError):
-                if e.resp.status in [403, 429, 500, 503]:
-                    is_rate_limit = True
-                elif e.resp.status == 404:
-                    raise e # 404s are handled specifically in the main loop
-            elif "429" in str(e) or "503" in str(e) or "quota" in str(e).lower():
-                is_rate_limit = True
-                
-            if attempt == max_retries - 1:
-                raise e
-                
-            if is_rate_limit or isinstance(e, json.decoder.JSONDecodeError):
-                jitter = random.uniform(0, 1)
-                delay = (base_delay * (2 ** attempt)) + jitter
-                log_action(f"  [API THROTTLE] Waiting {delay:.2f}s before retry...")
-                time.sleep(delay)
-            else:
-                raise e
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 
 def load_state():
     """Loads the category memory. Initializes with the Catch-All folder."""
@@ -66,7 +39,7 @@ def load_state():
             with open(STATE_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except json.JSONDecodeError:
-            log_action("[WARNING] State file corrupted. Building new state.")
+            log_action("[WARNING] State file corrupted. Building new state.", LOG_FILE)
             
     return {"categories": {"Uncategorized": None}}
 
@@ -91,15 +64,19 @@ def authenticate_god_mode():
             token.write(creds.to_json())
     return build('drive', 'v3', credentials=creds)
 
-def get_root_files_batch(drive_service):
-    """Pulls EXACTLY one batch of files from the root directory."""
+def get_root_files_batch(drive_service, ignore_ids):
+    """Pulls one batch of files from the root directory, explicitly ignoring poisoned IDs."""
     query = "'root' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'"
     
+    if ignore_ids:
+        for fid in ignore_ids:
+            query += f" and not id = '{fid}'"
+            
     def _fetch():
         results = drive_service.files().list(
             q=query, 
             pageSize=BATCH_SIZE, 
-            fields="files(id, name)"
+            fields="files(id, name, parents)"
         ).execute()
         return results.get('files', [])
         
@@ -130,22 +107,15 @@ def get_gemini_mapping(files, current_categories):
     
     def _generate():
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=GEMINI_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0.1
             )
         )
-        
-        clean_text = response.text.strip()
-        backticks = chr(96) * 3 
-        
-        if clean_text.startswith(f"{backticks}json"): clean_text = clean_text[7:]
-        if clean_text.startswith(backticks): clean_text = clean_text[3:]
-        if clean_text.endswith(backticks): clean_text = clean_text[:-3]
-            
-        return json.loads(clean_text.strip())
+        safe_text = clean_json_response(response.text)
+        return json.loads(safe_text)
         
     return execute_with_backoff(_generate)
 
@@ -155,7 +125,8 @@ def get_or_create_folder(drive_service, category_name, state):
         return state['categories'][category_name]
     
     def _create():
-        query = f"name='{category_name}' and mimeType='application/vnd.google-apps.folder' and 'root' in parents and trashed=false"
+        safe_name = category_name.replace("'", "\\'")
+        query = f"name='{safe_name}' and mimeType='application/vnd.google-apps.folder' and 'root' in parents and trashed=false"
         existing = drive_service.files().list(q=query, spaces='drive').execute().get('files', [])
         
         if existing:
@@ -164,7 +135,7 @@ def get_or_create_folder(drive_service, category_name, state):
         metadata = {'name': category_name, 'mimeType': 'application/vnd.google-apps.folder', 'parents': ['root']}
         folder = drive_service.files().create(body=metadata, fields='id').execute()
         folder_id = folder.get('id')
-        log_action(f"  [NEW FOLDER] Created category: {category_name}")
+        log_action(f"  [NEW FOLDER] Created category: {category_name}", LOG_FILE)
         return folder_id
 
     folder_id = execute_with_backoff(_create)
@@ -172,11 +143,10 @@ def get_or_create_folder(drive_service, category_name, state):
     save_state(state)
     return folder_id
 
-def move_file(drive_service, file_id, new_folder_id):
-    """Safely moves a file by explicitly removing old parents."""
+def move_file(drive_service, file_id, new_folder_id, previous_parents_list):
+    """Safely moves a file by explicitly removing old parents. Uses cached parents to save 1 API call."""
     def _move():
-        file = drive_service.files().get(fileId=file_id, fields='parents').execute()
-        previous_parents = ",".join(file.get('parents', []))
+        previous_parents = ",".join(previous_parents_list)
         
         drive_service.files().update(
             fileId=file_id,
@@ -188,19 +158,22 @@ def move_file(drive_service, file_id, new_folder_id):
     execute_with_backoff(_move)
 
 def run_organizer():
-    log_action("\n" + "="*50)
-    log_action("[SYSTEM] Booting Stateful Drive Organizer (God Mode + Backoff)...")
+    log_action("\n" + "="*50, LOG_FILE)
+    log_action("[SYSTEM] Booting Stateful Drive Organizer (God Mode + Backoff)...", LOG_FILE)
     
     drive_service = authenticate_god_mode()
     state = load_state()
     batch_count = 1
+    poisoned_files = [] 
     
     while True:
-        log_action(f"\n[SYSTEM] Fetching Batch #{batch_count}...")
-        files = get_root_files_batch(drive_service)
+        log_action(f"\n[SYSTEM] Fetching Batch #{batch_count}...", LOG_FILE)
+        files = get_root_files_batch(drive_service, poisoned_files)
         
         if not files:
-            log_action("[SUCCESS] No loose files remain in root. Organization Complete.")
+            log_action("[SUCCESS] No loose files remain in root. Organization Complete.", LOG_FILE)
+            if poisoned_files:
+                log_action(f"[INFO] Ignored {len(poisoned_files)} unmovable/ghost files during processing.", LOG_FILE)
             break
             
         try:
@@ -208,27 +181,27 @@ def run_organizer():
             mapping = get_gemini_mapping(files, current_cats)
             
             for file_id, category_name in mapping.items():
-                # 1. VALIDATION: Check if Gemini hallucinated the ID
                 valid_file = next((f for f in files if f['id'] == file_id), None)
                 if not valid_file:
-                    log_action(f"  [WARNING] Gemini hallucinated ID: {file_id}. Skipping.")
+                    log_action(f"  [WARNING] Gemini hallucinated ID: {file_id}. Skipping.", LOG_FILE)
                     continue
                     
                 try:
                     folder_id = get_or_create_folder(drive_service, category_name, state)
-                    move_file(drive_service, file_id, folder_id)
-                    log_action(f"  Moved: '{valid_file['name']}' -> [{category_name}]")
+                    parents = valid_file.get('parents', ['root'])
+                    move_file(drive_service, file_id, folder_id, parents)
+                    log_action(f"  Moved: '{valid_file['name'][:40]}' -> [{category_name}]", LOG_FILE)
                 except HttpError as e:
-                    # 2. 404 CATCH: If the file is a ghost, log it and skip to the next one
-                    if e.resp.status == 404:
-                        log_action(f"  [WARNING] File 404 Not Found: '{valid_file['name']}'. It may be a ghost file or restricted. Skipping.")
+                    if e.resp.status in [404, 403]:
+                        log_action(f"  [WARNING] File restricted/ghosted: '{valid_file['name'][:40]}'. Adding to ignore list.", LOG_FILE)
+                        poisoned_files.append(file_id)
                         continue
                     else:
                         raise e 
                         
         except Exception as e:
-            log_action(f"[FATAL BATCH ERROR] {e}. Terminating loop to prevent damage.")
-            break
+            log_action(f"[FATAL BATCH ERROR] {e}. Skipping batch to prevent infinite loop.", LOG_FILE)
+            poisoned_files.extend([f['id'] for f in files])
             
         batch_count += 1
         save_state(state)

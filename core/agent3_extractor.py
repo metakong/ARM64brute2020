@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+from dsie_utils import log_action, execute_with_backoff, clean_json_response, GEMINI_MODEL
+
 # --- CONFIGURATION ---
 load_dotenv(str(BASE_DIR / '.env'))
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
@@ -21,35 +23,6 @@ LOG_FILE = str(BASE_DIR / 'logs' / 'agent3_extractor_log.txt')
 
 os.makedirs(os.path.dirname(ATOMIC_FACTS_PATH), exist_ok=True)
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-
-def log_action(message):
-    print(message)
-    with open(LOG_FILE, 'a', encoding='utf-8') as f:
-        f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} | {message}\n")
-
-def execute_with_backoff(func, *args, max_retries=4, **kwargs):
-    """Exponential backoff with 'Fail-Fast' for permanent HTTP blocks."""
-    base_delay = 3
-    for attempt in range(max_retries):
-        try:
-            return func(*args, **kwargs)
-        except requests.exceptions.HTTPError as e:
-            # FAIL FAST: Do not retry 451 (Legal), 403 (Forbidden), or 404 (Not Found)
-            if e.response is not None and e.response.status_code in [403, 404, 451]:
-                log_action(f"     [FATAL] Permanent Block ({e.response.status_code}). Skipping retries.")
-                return None
-            raise_e = e
-        except Exception as e:
-            raise_e = e
-
-        if attempt == max_retries - 1:
-            log_action(f"     [FATAL] Max retries reached: {raise_e}")
-            return None
-            
-        jitter = random.uniform(0, 1)
-        delay = (base_delay * (2 ** attempt)) + jitter
-        log_action(f"     [WAITING] Network/API throttle. Retrying in {delay:.1f}s... ({str(raise_e)[:40]})")
-        time.sleep(delay)
 
 def fetch_markdown_with_jina(target_url):
     jina_url = f"https://r.jina.ai/{target_url}"
@@ -94,7 +67,7 @@ def extract_atomic_facts(markdown_content):
     
     def _generate():
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=GEMINI_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -102,25 +75,16 @@ def extract_atomic_facts(markdown_content):
             )
         )
         
-        clean_text = response.text.strip()
-        if clean_text.startswith("```"):
-            lines = clean_text.split('\n')
-            if lines and lines[0].startswith("```"): 
-                lines = lines[1:]
-            if lines and lines[-1].startswith("```"): 
-                lines = lines[:-1]
-            clean_text = '\n'.join(lines).strip()
-            
-        return json.loads(clean_text)
+        return json.loads(clean_json_response(response.text))
         
     return execute_with_backoff(_generate)
 
 def run_extractor_agent():
-    log_action("\n" + "="*50)
-    log_action("[AGENT 3] Booting The Extractor (Fail-Fast & Save-As-You-Go Enabled)...")
+    log_action("\n" + "="*50, LOG_FILE)
+    log_action("[AGENT 3] Booting The Extractor (Fail-Fast & Save-As-You-Go Enabled)...", LOG_FILE)
     
     if not os.path.exists(WINNING_URLS_PATH):
-        log_action("[FATAL] Winning URLs queue not found.")
+        log_action("[FATAL] Winning URLs queue not found.", LOG_FILE)
         return
         
     with open(WINNING_URLS_PATH, 'r', encoding='utf-8') as f:
@@ -134,28 +98,28 @@ def run_extractor_agent():
             with open(ATOMIC_FACTS_PATH, 'r', encoding='utf-8') as f:
                 extracted_database = json.load(f)
                 seen_links = {item['original_link'] for item in extracted_database}
-            log_action(f"[SYSTEM] Resuming. Found {len(extracted_database)} previously extracted articles.")
+            log_action(f"[SYSTEM] Resuming. Found {len(extracted_database)} previously extracted articles.", LOG_FILE)
         except Exception as e:
-            log_action(f"[WARNING] Could not load previous state: {e}")
+            log_action(f"[WARNING] Could not load previous state: {e}", LOG_FILE)
 
-    log_action("[SYSTEM] Commencing Extraction for remaining targets...")
+    log_action("[SYSTEM] Commencing Extraction for remaining targets...", LOG_FILE)
     
     for idx, article in enumerate(winning_articles):
         if article['link'] in seen_links:
             continue
             
-        log_action(f"  -> Processing [{idx+1}/{len(winning_articles)}]: {article['title'][:50]}...")
+        log_action(f"  -> Processing [{idx+1}/{len(winning_articles)}]: {article['title'][:50]}...", LOG_FILE)
         
         raw_markdown = fetch_markdown_with_jina(article['link'])
         
         if not raw_markdown or len(raw_markdown) < 50:
-            log_action("     [SKIP] Failed to fetch or page is empty.")
+            log_action("     [SKIP] Failed to fetch or page is empty.", LOG_FILE)
             continue
             
         facts = extract_atomic_facts(raw_markdown)
         
         if facts:
-            log_action(f"     [SUCCESS] Extracted {len(facts)} atomic facts.")
+            log_action(f"     [SUCCESS] Extracted {len(facts)} atomic facts.", LOG_FILE)
             extracted_database.append({
                 "original_title": article['title'],
                 "original_link": article['link'],
@@ -167,12 +131,12 @@ def run_extractor_agent():
             with open(ATOMIC_FACTS_PATH, 'w', encoding='utf-8') as f:
                 json.dump(extracted_database, f, indent=4)
         else:
-            log_action("     [SKIP] No verifiable facts found in text.")
+            log_action("     [SKIP] No verifiable facts found in text.", LOG_FILE)
             
         time.sleep(4)
 
-    log_action("\n[SUCCESS] Agent 3 complete.")
-    log_action(f"[SYSTEM] Handoff ready at: {ATOMIC_FACTS_PATH}")
+    log_action("\n[SUCCESS] Agent 3 complete.", LOG_FILE)
+    log_action(f"[SYSTEM] Handoff ready at: {ATOMIC_FACTS_PATH}", LOG_FILE)
 
 if __name__ == "__main__":
     run_extractor_agent()

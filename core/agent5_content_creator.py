@@ -9,6 +9,8 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
+from dsie_utils import log_action, execute_with_backoff, clean_json_response, GEMINI_MODEL
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(str(BASE_DIR / '.env'))
@@ -32,36 +34,6 @@ class ArticleContent(BaseModel):
     ui_headline: str
     ui_single_sentence_summary: str
     longform_markdown_article_text: str
-
-def log_action(message):
-    print(message)
-    with open(LOG_FILE, 'a', encoding='utf-8') as f:
-        f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} | {message}\n")
-
-def execute_with_backoff(func, *args, max_retries=5, **kwargs):
-    base_delay = 5
-    for attempt in range(max_retries):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            if attempt == max_retries - 1:
-                log_action(f"     [FATAL] Max retries reached: {e}")
-                return None
-            jitter = random.uniform(0, 1)
-            delay = (base_delay * (2 ** attempt)) + jitter
-            log_action(f"     [API THROTTLE] Waiting {delay:.2f}s... ({str(e)[:40]})")
-            time.sleep(delay)
-
-def clean_json_response(raw_text):
-    clean_text = raw_text.strip()
-    if clean_text.startswith("```"):
-        lines = clean_text.split('\n')
-        if lines and lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].startswith("```"):
-            lines = lines[:-1]
-        clean_text = '\n'.join(lines).strip()
-    return clean_text
 
 def create_longform_content(brief):
     prompt = f"""
@@ -105,8 +77,9 @@ def create_longform_content(brief):
     """
     
     def _generate():
+        # UPDATED: Current 2026 model for speed and large context windows
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=GEMINI_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -120,44 +93,66 @@ def create_longform_content(brief):
     return execute_with_backoff(_generate)
 
 def run_content_creator():
-    log_action("\n==================================================")
-    log_action("[AGENT 5] Booting Content Creator & Categorizer...")
+    log_action("\n==================================================", LOG_FILE)
+    log_action("[AGENT 5] Booting Content Creator & Categorizer...", LOG_FILE)
     
     if not os.path.exists(CONSOLIDATED_BRIEFS_PATH):
-        log_action("[FATAL] Consolidated briefs not found.")
+        log_action("[FATAL] Consolidated briefs not found.", LOG_FILE)
         return
         
     with open(CONSOLIDATED_BRIEFS_PATH, 'r', encoding='utf-8') as f:
         briefs = json.load(f)
         
     if not briefs:
+        log_action("[ERROR] No briefs available to process.", LOG_FILE)
         return
 
-    log_action(f"[SYSTEM] Loaded {len(briefs)} intelligence briefs for article generation.")
-    
+    # 1. RESUME CHECK: State Tracking
     final_payload = []
+    processed_topics = set()
+    
+    if os.path.exists(AGENT_5_OUTPUT_PATH):
+        try:
+            with open(AGENT_5_OUTPUT_PATH, 'r', encoding='utf-8') as f:
+                final_payload = json.load(f)
+                processed_topics = {article.get('Original Topic') for article in final_payload if article.get('Original Topic')}
+                log_action(f"[SYSTEM] Found existing progress. Loaded {len(processed_topics)} completed articles.", LOG_FILE)
+        except:
+            log_action("[SYSTEM] Staging file corrupted or empty. Starting fresh.", LOG_FILE)
+            final_payload = []
+
+    log_action(f"[SYSTEM] Total intelligence briefs pending generation: {len(briefs)}.", LOG_FILE)
     
     for idx, brief in enumerate(briefs):
         topic_name = brief.get('cluster_topic', 'Unknown Topic')
-        log_action(f"  -> Writing Article [{idx+1}/{len(briefs)}]: {topic_name[:40]}...")
+        
+        # 2. SKIP IF ALREADY PROCESSED
+        if topic_name in processed_topics:
+            continue
+            
+        log_action(f"  -> Writing Article [{idx+1}/{len(briefs)}]: {topic_name[:40]}...", LOG_FILE)
         
         article_data = create_longform_content(brief)
         
         if article_data:
             formatted_data = {
+                "Original Topic": topic_name, # Added tracking key for resume logic
                 "Pillar": article_data["pillar"],
                 "UI Headline": article_data["ui_headline"],
                 "UI Single-Sentence Summary": article_data["ui_single_sentence_summary"],
                 "Longform Markdown Article Text": article_data["longform_markdown_article_text"]
             }
             final_payload.append(formatted_data)
+            
+            # 3. INCREMENTAL SAVE: Protect the 90-minute marathon
+            with open(AGENT_5_OUTPUT_PATH, 'w', encoding='utf-8') as f:
+                json.dump(final_payload, f, indent=4)
+        else:
+            log_action(f"     [SKIPPED] Critical failure generating article for: {topic_name[:40]}", LOG_FILE)
         
-        time.sleep(4)
+        time.sleep(2)
 
-    with open(AGENT_5_OUTPUT_PATH, 'w', encoding='utf-8') as f:
-        json.dump(final_payload, f, indent=4)
-        
-    log_action(f"\n[SUCCESS] Agent 5 complete. Wrote {len(final_payload)} longform articles.")
+    log_action(f"\n[SUCCESS] Agent 5 complete. Finalized {len(final_payload)} longform articles.", LOG_FILE)
 
 if __name__ == "__main__":
     run_content_creator()

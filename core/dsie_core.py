@@ -1,7 +1,12 @@
 import os
+from pathlib import Path
 
-# 1. Map Cache
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# 1. Map Cache & Ephemeral Storage (SSD Protection)
 os.environ["FOUNDRY_LOCAL_CACHE_DIR"] = r"Z:\foundry_cache"
+os.environ["TEMP"] = r"Z:\SystemTemp"
+os.environ["TMP"] = r"Z:\SystemTemp"
 
 # 2. HARD-LINK QUALCOMM HEXAGON NPU BINARIES (QAIRT)
 qairt_lib = r"Z:\QCDrivers\qairt\2.45.0.260326\lib\arm64x-windows-msvc"
@@ -21,7 +26,6 @@ import time
 import datetime
 import re
 import json
-from pathlib import Path
 import requests
 import numpy as np
 import wave
@@ -31,6 +35,7 @@ from foundry_local_sdk import Configuration, FoundryLocalManager
 from foundry_local_sdk.logging_helper import LogLevel
 
 POWERSHELL_EXE = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+TEMP_WAV_PATH = str(BASE_DIR / 'logs' / 'temp_input.wav')
 
 def get_optimal_mic_index():
     devices = sd.query_devices()
@@ -47,9 +52,6 @@ class DSIECore:
         log_path = r"Z:\foundry_project\logs"
         os.makedirs(log_path, exist_ok=True)
         
-        # 3. FORCE THE EXECUTION PROVIDER GLOBALLY
-        # We use additional_settings to bypass the catalog and force the C# core
-        # to initialize ONNX with the Qualcomm Neural Network Execution Provider.
         config = Configuration(
             app_name="dsie_codex",
             model_cache_dir=r"Z:\foundry_cache\models",
@@ -71,8 +73,6 @@ class DSIECore:
     def load_hardware(self):
         print("[SYSTEM] Syncing Models with Native SDK Registry...")
         try:
-            # 4. Request the generic model so Azure doesn't block it,
-            # but it will be executed on the NPU because of the global config override above.
             print(" -> Syncing Qwen to Hexagon NPU...")
             self.llm_model = self.manager.catalog.get_model("qwen2.5-0.5b")
             
@@ -99,10 +99,10 @@ class DSIECore:
         clean_text = re.sub(r'[^a-zA-Z0-9\s\.\?\!,]', '', text).strip()
         if not clean_text or len(clean_text) < 2: return
         print(f"\n[CODEX]: {clean_text}")
-        ps_cmd = f"Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('{clean_text}')"
-        subprocess.run([POWERSHELL_EXE, "-Command", ps_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        ps_cmd = "Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Speak($args[0])"
+        subprocess.run([POWERSHELL_EXE, "-Command", ps_cmd, clean_text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    def listen(self, filename="temp_input.wav", samplerate=16000, threshold=0.03, silence_delay=0.5):
+    def listen(self, filename=TEMP_WAV_PATH, samplerate=16000, threshold=0.03, silence_delay=0.5):
         chunk_samples = int(samplerate * 0.1)
         max_silence_chunks = int(silence_delay / 0.1)
         audio_buffer, is_recording, silence_counter = [], False, 0
@@ -132,7 +132,7 @@ class DSIECore:
         return True
 
     def push_transcript(self, role, text):
-        try: requests.post("http://127.0.0.1:8090/api/collections/transcripts/records", json={"role": role, "text": text}, timeout=0.1)
+        try: requests.post("http://127.0.0.1:8090/api/collections/transcripts/records", json={"role": role, "text": text}, timeout=0.5)
         except Exception: pass
 
     def push_to_vault(self, content, record_type="note"):
@@ -151,10 +151,9 @@ class DSIECore:
         hallucinations = ["thank you", "watching", "subscribe", "cannot process", "audio file", "i'm sorry", "am sorry", "hear that", "subtitle"]
         
         while True:
-            temp_wav = "temp_input.wav"
-            if self.listen(filename=temp_wav, threshold=vad_threshold):
+            if self.listen(filename=TEMP_WAV_PATH, threshold=vad_threshold):
                 try:
-                    result = self.audio_client.transcribe(temp_wav)
+                    result = self.audio_client.transcribe(TEMP_WAV_PATH)
                     clean_text = result.text.strip()
                     lower_text = clean_text.lower()
                     
@@ -165,6 +164,11 @@ class DSIECore:
 
                     print(f"\n[YOU]: {clean_text}")
                     
+                    if lower_text in ["codex shutdown", "codex sleep"]:
+                        self.speak("Shutting down. Goodbye, CEO.")
+                        self.shutdown()
+                        sys.exit(0)
+
                     if "codex note" in lower_text or "codex remember" in lower_text:
                         content = re.sub(r'codex (note|remember)\s*(that)?', '', lower_text).strip()
                         self.push_to_vault(content)

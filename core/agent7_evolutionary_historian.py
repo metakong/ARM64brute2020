@@ -3,10 +3,13 @@ import json
 import re
 import time
 import random
+import string
 from pathlib import Path
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+
+from dsie_utils import log_action, execute_with_backoff, clean_json_response, GEMINI_MODEL
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -20,25 +23,6 @@ SEED_LIST_PATH = str(BASE_DIR / 'OSINT Seed List Generation.md')
 LOG_FILE = str(BASE_DIR / 'logs' / 'agent7_historian_log.txt')
 
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-
-def log_action(message):
-    print(message)
-    with open(LOG_FILE, 'a', encoding='utf-8') as f:
-        f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} | {message}\n")
-
-def execute_with_backoff(func, *args, max_retries=4, **kwargs):
-    base_delay = 5
-    for attempt in range(max_retries):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            if attempt == max_retries - 1:
-                log_action(f"     [FATAL] Max retries reached: {e}")
-                return None
-            jitter = random.uniform(0, 1)
-            delay = (base_delay * (2 ** attempt)) + jitter
-            log_action(f"     [API THROTTLE] Waiting {delay:.2f}s... ({str(e)[:40]})")
-            time.sleep(delay)
 
 def extract_existing_urls_from_markdown(md_path):
     """Extracts all URLs already present in the Markdown seed list to prevent duplicates."""
@@ -69,12 +53,12 @@ def detect_table_columns(md_path):
     return default_cols
 
 def optimize_pipeline():
-    log_action("\n" + "="*50)
-    log_action("[AGENT 7] Booting Evolutionary Historian...")
+    log_action("\n" + "="*50, LOG_FILE)
+    log_action("[AGENT 7] Booting Evolutionary Historian...", LOG_FILE)
 
     # --- 1. Update Global State (History) ---
     if not os.path.exists(WINNING_URLS):
-        log_action("[FATAL] Winning URLs not found. Aborting.")
+        log_action("[FATAL] Winning URLs not found. Aborting.", LOG_FILE)
         return
 
     with open(WINNING_URLS, 'r', encoding='utf-8') as f:
@@ -98,28 +82,32 @@ def optimize_pipeline():
     with open(STATE_PATH, 'w', encoding='utf-8') as f:
         json.dump(state, f, indent=4)
 
-    log_action(f"  -> Archived {new_urls_archived} new winning URLs to global state.")
+    log_action(f"  -> Archived {new_urls_archived} new winning URLs to global state.", LOG_FILE)
 
     # --- 2. Cull Low-Performers from Scored Intake ---
     if os.path.exists(INTAKE_LOG):
         with open(INTAKE_LOG, 'r', encoding='utf-8') as f:
             intake = json.load(f)
         high_performers = {item['source_feed'] for item in intake if item.get('score', 0) > 70}
-        log_action(f"  -> High-performing source feeds today: {len(high_performers)}")
+        log_action(f"  -> High-performing source feeds today: {len(high_performers)}", LOG_FILE)
     else:
         high_performers = set()
-        log_action("  -> [WARNING] No scored intake log found. Skipping cull analysis.")
+        log_action("  -> [WARNING] No scored intake log found. Skipping cull analysis.", LOG_FILE)
 
     # --- 3. Hunt for New Seeds via LLM & Append to Markdown ---
     existing_urls = extract_existing_urls_from_markdown(SEED_LIST_PATH)
-    log_action(f"  -> Current seed list contains {len(existing_urls)} unique URLs.")
+    log_action(f"  -> Current seed list contains {len(existing_urls)} unique URLs.", LOG_FILE)
 
     new_discoveries = []
 
-    for winner in winners[:3]:  # Only use top 3 to save tokens
-        log_action(f"  -> Discovering new feeds based on: {winner.get('title', 'N/A')[:50]}...")
+    # SAFETY CHECK: Ensure we have winners to analyze
+    if not winners:
+         log_action("  -> [WARNING] No winning URLs today. Skipping feed discovery.", LOG_FILE)
+    else:
+        for winner in winners[:3]:  # Only use top 3 to save tokens
+            log_action(f"  -> Discovering new feeds based on: {winner.get('title', 'N/A')[:50]}...", LOG_FILE)
 
-        prompt = f"""Based on this high-value intelligence article:
+            prompt = f"""Based on this high-value intelligence article:
 Title: {winner.get('title', 'N/A')}
 Link: {winner['link']}
 
@@ -132,49 +120,44 @@ Return ONLY a raw JSON array of objects with "url" and "topic" keys. Example:
 [{{"url": "https://example.com/feed.xml", "topic": "Milwaukee Business News"}}]
 """
 
-        def _generate():
-            response = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    temperature=0.3
+            def _generate():
+                # UPDATED: Standardized to the 2026 stable API endpoint
+                response = client.models.generate_content(
+                    model=GEMINI_MODEL,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.3
+                    )
                 )
-            )
-            clean_text = response.text.strip()
-            if clean_text.startswith("```"):
-                lines = clean_text.split('\n')
-                if lines and lines[0].startswith("```"):
-                    lines = lines[1:]
-                if lines and lines[-1].startswith("```"):
-                    lines = lines[:-1]
-                clean_text = '\n'.join(lines).strip()
-            return json.loads(clean_text)
+                # UPDATED: Using the robust JSON cleaner
+                safe_text = clean_json_response(response.text)
+                return json.loads(safe_text)
 
-        result = execute_with_backoff(_generate)
+            result = execute_with_backoff(_generate)
 
-        if result and isinstance(result, list):
-            for entry in result:
-                url = entry.get('url', '')
-                topic = entry.get('topic', 'DISCOVERED')
-                if url and url.startswith('http') and url not in existing_urls:
-                    new_discoveries.append({"url": url, "topic": topic})
-                    existing_urls.add(url)
+            if result and isinstance(result, list):
+                for entry in result:
+                    url = entry.get('url', '')
+                    topic = entry.get('topic', 'DISCOVERED')
+                    if url and url.startswith('http') and url not in existing_urls:
+                        new_discoveries.append({"url": url, "topic": topic})
+                        existing_urls.add(url)
 
-        time.sleep(4)
+            time.sleep(4)
 
     # --- 4. Append Discoveries as Markdown Table Rows (Structure-Aware) ---
     if new_discoveries:
         # Detect the existing table column structure from the seed list
         columns = detect_table_columns(SEED_LIST_PATH)
         num_cols = len(columns)
-        log_action(f"  -> Detected {num_cols}-column table structure: {columns}")
-        log_action(f"  -> Appending {len(new_discoveries)} new seed URLs to master seed list...")
+        log_action(f"  -> Detected {num_cols}-column table structure: {columns}", LOG_FILE)
+        log_action(f"  -> Appending {len(new_discoveries)} new seed URLs to master seed list...", LOG_FILE)
 
         with open(SEED_LIST_PATH, 'a', encoding='utf-8') as f:
             # Enforce leading newline to prevent corrupting the last line of existing content
-            f.write("\n\n<!-- === AGENT 7 AUTO-DISCOVERED FEEDS === -->\n")
-            f.write(f"<!-- Discovery Date: {time.strftime('%Y-%m-%d %H:%M:%S')} -->\n")
+            f.write("\n\n\n")
+            f.write(f"\n")
 
             # Write a header row matching the detected column structure
             header_row = "| " + " | ".join(columns) + " |\n"
@@ -199,11 +182,11 @@ Return ONLY a raw JSON array of objects with "url" and "topic" keys. Example:
                     row = f"| Auto-Discovered | [{safe_url}]({safe_url}) |" + " |" * max(0, num_cols - 2) + "\n"
 
                 f.write(row)
-                log_action(f"     [NEW SEED] {entry['url'][:60]}")
+                log_action(f"     [NEW SEED] {entry['url'][:60]}", LOG_FILE)
     else:
-        log_action("  -> No new unique feeds discovered this cycle.")
+        log_action("  -> No new unique feeds discovered this cycle.", LOG_FILE)
 
-    log_action("\n[SUCCESS] Agent 7 complete. Seed list evolution cycle finished.")
+    log_action("\n[SUCCESS] Agent 7 complete. Seed list evolution cycle finished.", LOG_FILE)
 
 if __name__ == "__main__":
     optimize_pipeline()

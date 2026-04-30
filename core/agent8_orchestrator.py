@@ -4,7 +4,6 @@ import json
 import time
 import socket
 import subprocess
-import tempfile
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
@@ -70,20 +69,36 @@ def check_and_start_pocketbase():
         stderr=subprocess.DEVNULL,
         creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
     )
-    time.sleep(3)
-    log_action("[INFRA] PocketBase boot sequence complete. Proceeding.")
+    
+    # Active PocketBase Polling
+    start_time = time.time()
+    while True:
+        try:
+            resp = requests.get('http://127.0.0.1:8090/api/health', timeout=1)
+            if resp.status_code == 200:
+                log_action("[INFRA] PocketBase boot sequence complete. Proceeding.")
+                return
+        except Exception:
+            pass
+            
+        if time.time() - start_time > 15:
+            log_action("[FATAL] PocketBase failed to start within 15 seconds. Aborting pipeline.")
+            sys.exit(1)
+            
+        time.sleep(0.5)
 
 
 # =============================================================================
 # PHASE 1: SEQUENTIAL AGENT PIPELINE
 # =============================================================================
 AGENT_CHAIN = [
-    ("Agent 1 (Fetcher)",     str(CORE_DIR / 'agent1_fetcher.py')),
-    ("Agent 2 (Scorer)",      str(CORE_DIR / 'agent2_scorer.py')),
-    ("Agent 3 (Extractor)",   str(CORE_DIR / 'agent3_extractor.py')),
-    ("Agent 4 (Consolidator)",str(CORE_DIR / 'agent4_consolidator.py')),
-    ("Agent 5 (Creator)",     str(CORE_DIR / 'agent5_content_creator.py')),
-    ("Agent 7 (Historian)",   str(CORE_DIR / 'agent7_evolutionary_historian.py')),
+    ("Agent 1 (Fetcher)",      str(CORE_DIR / 'agent1_fetcher.py')),
+    ("Agent 2 (Scorer)",       str(CORE_DIR / 'agent2_scorer.py')),
+    ("Agent 3 (Extractor)",    str(CORE_DIR / 'agent3_extractor.py')),
+    ("Agent 4 (Consolidator)", str(CORE_DIR / 'agent4_consolidator.py')),
+    ("Agent 5 (Creator)",      str(CORE_DIR / 'agent5_content_creator.py')),
+    ("Agent 6 (Injector)",     str(CORE_DIR / 'agent6_dashboard_injector.py')), # RESTORED
+    ("Agent 7 (Historian)",    str(CORE_DIR / 'agent7_evolutionary_historian.py')),
 ]
 
 def run_agent_chain():
@@ -98,10 +113,10 @@ def run_agent_chain():
         log_action(f"\n--- Executing: {agent_name} ---")
         start = time.time()
 
+        # FIX: Removed capture_output=True. This allows the sub-agents' print() 
+        # statements to stream directly to your PowerShell window in real-time.
         result = subprocess.run(
             [python_exe, agent_path],
-            capture_output=True,
-            text=True,
             cwd=str(BASE_DIR)
         )
 
@@ -109,8 +124,6 @@ def run_agent_chain():
 
         if result.returncode != 0:
             log_action(f"[FATAL] {agent_name} FAILED (exit code {result.returncode}) after {elapsed:.1f}s")
-            if result.stderr:
-                log_action(f"  STDERR: {result.stderr[:500]}")
             log_action("[ORCHESTRATOR] Pipeline HALTED. Fix the failing agent and re-run.")
             return False
         else:
@@ -241,7 +254,6 @@ def run_rolling_archive():
 
         log_action(f"  Found {len(old_records)} records to archive.")
 
-        # Write to temp file inside the project (not /tmp)
         archive_dir = str(BASE_DIR / 'logs')
         timestamp = time.strftime('%Y%m%d_%H%M%S')
         archive_filename = f"archive_{collection}_{timestamp}.json"
@@ -251,7 +263,6 @@ def run_rolling_archive():
             json.dump(old_records, f, indent=2)
         log_action(f"  Exported to: {temp_path}")
 
-        # Upload to Google Drive
         try:
             success = upload_to_gdrive(drive_service, folder_id, temp_path, archive_filename)
         except Exception as e:
@@ -265,12 +276,10 @@ def run_rolling_archive():
 
         log_action(f"  [SUCCESS] Uploaded {archive_filename} to Google Drive.")
 
-        # ONLY after confirmed upload: delete from PocketBase
         record_ids = [r['id'] for r in old_records]
         deleted = delete_pocketbase_records(collection, record_ids)
         log_action(f"  [PURGED] Deleted {deleted}/{len(record_ids)} records from local PocketBase.")
 
-        # Clean up temp file
         try:
             os.remove(temp_path)
             log_action(f"  [CLEANUP] Removed temporary archive file.")
@@ -278,6 +287,38 @@ def run_rolling_archive():
             pass
 
     log_action("\n[ORCHESTRATOR] Rolling archive cycle complete.")
+
+
+# =============================================================================
+# PHASE 3: SCRATCH SPACE PURGE (LOCAL SSD PROTECTION)
+# =============================================================================
+def cleanup_scratch_space():
+    """Safely delete massive temporary JSON files generated during the pipeline run."""
+    log_action("\n" + "="*60)
+    log_action("[ORCHESTRATOR] Initiating Scratch Space Purge (--cleanup flag detected)")
+    
+    # List of ephemeral files that are no longer needed once the pipeline finishes
+    files_to_purge = [
+        BASE_DIR / 'dashboard' / 'OSINT_System_State' / 'atomic_facts_log.json',
+        BASE_DIR / 'dashboard' / 'OSINT_System_State' / 'agent5_content_staging.json',
+        BASE_DIR / 'dashboard' / 'OSINT_System_State' / 'scored_intake_log.json',
+        BASE_DIR / 'dashboard' / 'consolidated_briefs.json'
+    ]
+
+    bytes_freed = 0
+    for target in files_to_purge:
+        if target.exists():
+            try:
+                size = target.stat().st_size
+                target.unlink()
+                bytes_freed += size
+                log_action(f"  [DELETED] {target.name} ({(size / 1024 / 1024):.2f} MB)")
+            except Exception as e:
+                log_action(f"  [ERROR] Failed to delete {target.name}: {e}")
+        else:
+            log_action(f"  [SKIPPED] {target.name} not found.")
+
+    log_action(f"[SUCCESS] Scratch space purged. Freed {(bytes_freed / 1024 / 1024):.2f} MB.")
 
 
 # =============================================================================
@@ -291,15 +332,23 @@ def main():
     # Phase 0: Infrastructure checks
     check_and_start_pocketbase()
 
-    # Phase 1: Run the agent chain
-    pipeline_ok = run_agent_chain()
+    # Determine if we run the full pipeline or just cleanup
+    run_pipeline = "--cleanup-only" not in sys.argv
+    do_cleanup = "--cleanup" in sys.argv or "--cleanup-only" in sys.argv
 
-    if not pipeline_ok:
-        log_action("[ORCHESTRATOR] Skipping archival due to pipeline failure.")
-        return
+    if run_pipeline:
+        # Phase 1: Run the agent chain
+        pipeline_ok = run_agent_chain()
+        if not pipeline_ok:
+            log_action("[ORCHESTRATOR] Skipping archival & cleanup due to pipeline failure.")
+            return
 
     # Phase 2: Archive and purge old data
     run_rolling_archive()
+
+    # Phase 3: Hardware Protection (Execute if flag was passed)
+    if do_cleanup:
+        cleanup_scratch_space()
 
     log_action("\n[ORCHESTRATOR] All phases complete. System idle.")
 

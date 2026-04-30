@@ -11,6 +11,8 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
+from dsie_utils import log_action, execute_with_backoff, clean_json_response, GEMINI_MODEL
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(str(BASE_DIR / '.env'))
@@ -37,25 +39,6 @@ class ExecutiveBrief(BaseModel):
     key_details: List[str]
     source_links: List[str]
 
-def log_action(message):
-    print(message)
-    with open(LOG_FILE, 'a', encoding='utf-8') as f:
-        f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} | {message}\n")
-
-def execute_with_backoff(func, *args, max_retries=5, **kwargs):
-    base_delay = 5
-    for attempt in range(max_retries):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            if attempt == max_retries - 1:
-                log_action(f"     [FATAL] Max retries reached: {e}")
-                raise e
-            jitter = random.uniform(0, 1)
-            delay = (base_delay * (2 ** attempt)) + jitter
-            log_action(f"     [API THROTTLE] Waiting {delay:.2f}s... ({str(e)[:40]})")
-            time.sleep(delay)
-
 def normalize_fact(fact):
     return fact.strip().lower().translate(str.maketrans('', '', string.punctuation))
 
@@ -80,18 +63,6 @@ def frequency_based_purge(raw_data):
             })
     return cleaned_articles
 
-def clean_json_response(raw_text):
-    """Robustly strips markdown and trailing garbage from LLM JSON responses."""
-    clean_text = raw_text.strip()
-    if clean_text.startswith("```"):
-        lines = clean_text.split('\n')
-        if lines and lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].startswith("```"):
-            lines = lines[:-1]
-        clean_text = '\n'.join(lines).strip()
-    return clean_text
-
 def categorize_batch(articles_batch):
     prompt = f"""
     Categorize each of the following articles into a broad "Topic Tag".
@@ -101,7 +72,7 @@ def categorize_batch(articles_batch):
     """
     def _generate():
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=GEMINI_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -122,7 +93,7 @@ def synthesize_topic(topic, articles):
     """
     def _generate():
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=GEMINI_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -135,31 +106,45 @@ def synthesize_topic(topic, articles):
     return execute_with_backoff(_generate)
 
 def run_consolidator_agent():
-    log_action("\n==================================================")
-    log_action("[AGENT 4] Booting The Consolidator...")
+    log_action("\n==================================================", LOG_FILE)
+    log_action("[AGENT 4] Booting The Consolidator...", LOG_FILE)
     
     if not os.path.exists(ATOMIC_FACTS_PATH):
+        log_action("[ERROR] Atomic facts log not found. Aborting.", LOG_FILE)
         return
         
     with open(ATOMIC_FACTS_PATH, 'r', encoding='utf-8') as f:
         raw_data = json.load(f)
         
     if not raw_data:
+        log_action("[ERROR] Atomic facts log is empty. Aborting.", LOG_FILE)
         return
 
-    log_action("[SYSTEM] Executing programmatic boilerplate purge...")
+    final_briefs = []
+    processed_topics = set()
+    if os.path.exists(CONSOLIDATED_BRIEFS_PATH):
+        try:
+            with open(CONSOLIDATED_BRIEFS_PATH, 'r', encoding='utf-8') as f:
+                final_briefs = json.load(f)
+                processed_topics = {b['cluster_topic'] for b in final_briefs}
+                log_action(f"[SYSTEM] Found existing progress. Loaded {len(processed_topics)} briefs.", LOG_FILE)
+        except:
+            log_action("[SYSTEM] Existing briefs file corrupted or empty. Starting fresh.", LOG_FILE)
+            final_briefs = []
+
+    log_action("[SYSTEM] Executing programmatic boilerplate purge...", LOG_FILE)
     cleaned_data = frequency_based_purge(raw_data)
-    log_action(f"[SYSTEM] Survived Purge: {len(cleaned_data)} articles with valid delta facts.")
+    log_action(f"[SYSTEM] Survived Purge: {len(cleaned_data)} articles with valid delta facts.", LOG_FILE)
     
     topic_groups = {}
-    batch_size = 25  # Reduced from 50 to prevent JSON truncation
+    batch_size = 25  
     
     total_batches = (len(cleaned_data) + batch_size - 1) // batch_size
     
-    log_action(f"[SYSTEM] Mapping Phase: Processing {total_batches} batches...")
+    log_action(f"[SYSTEM] Mapping Phase: Processing {total_batches} batches...", LOG_FILE)
     for i in range(0, len(cleaned_data), batch_size):
         batch_num = (i // batch_size) + 1
-        log_action(f"  -> Mapping batch {batch_num}/{total_batches}...")
+        log_action(f"  -> Mapping batch {batch_num}/{total_batches}...", LOG_FILE)
         
         batch = cleaned_data[i:i + batch_size]
         payload = [{"link": a['link'], "title": a['title']} for a in batch]
@@ -174,22 +159,28 @@ def run_consolidator_agent():
                     if tag not in topic_groups:
                         topic_groups[tag] = []
                     topic_groups[tag].append(article)
-        time.sleep(4)
+        time.sleep(2)
 
-    log_action(f"[SYSTEM] Synthesis Phase: Synthesizing {len(topic_groups)} unique topics...")
-    final_briefs = []
+    log_action(f"[SYSTEM] Synthesis Phase: Synthesizing {len(topic_groups)} unique topics...", LOG_FILE)
     
     for idx, (topic, articles) in enumerate(topic_groups.items()):
-        log_action(f"  -> Synthesizing [{idx+1}/{len(topic_groups)}]: {topic[:40]}...")
+        if topic in processed_topics:
+            continue
+
+        log_action(f"  -> Synthesizing [{idx+1}/{len(topic_groups)}]: {topic[:40]}...", LOG_FILE)
+        
         brief = synthesize_topic(topic, articles)
+        
         if brief:
             final_briefs.append(brief)
-        time.sleep(4)
+            with open(CONSOLIDATED_BRIEFS_PATH, 'w', encoding='utf-8') as f:
+                json.dump(final_briefs, f, indent=4)
+        else:
+            log_action(f"     [SKIPPED] Critical failure on Topic: {topic[:40]}. Moving to next.", LOG_FILE)
+            
+        time.sleep(2)
 
-    with open(CONSOLIDATED_BRIEFS_PATH, 'w', encoding='utf-8') as f:
-        json.dump(final_briefs, f, indent=4)
-        
-    log_action(f"\n[SUCCESS] Agent 4 complete. Generated {len(final_briefs)} Briefs.")
+    log_action(f"\n[SUCCESS] Agent 4 complete. Finalized {len(final_briefs)} Briefs.", LOG_FILE)
 
 if __name__ == "__main__":
     run_consolidator_agent()

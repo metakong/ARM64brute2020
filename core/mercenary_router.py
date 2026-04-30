@@ -1,19 +1,19 @@
 import os
+import time
+import random
 import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-# Load keys from the hidden .env file
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 app = FastAPI(title="DSIE Mercenary Router")
 
-# Allow the local HTML dashboard to talk to this Python server
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://127.0.0.1:8080", "http://localhost:8080"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -24,7 +24,6 @@ class ChatRequest(BaseModel):
     messages: list
     temperature: float = 0.2
 
-# The master routing table
 PROVIDERS = {
     "Cerebras Cloud": {"url": "https://api.cerebras.ai/v1/chat/completions", "env_key": "CEREBRAS_API_KEY"},
     "GroqCloud": {"url": "https://api.groq.com/openai/v1/chat/completions", "env_key": "GROQ_API_KEY"},
@@ -49,12 +48,11 @@ PROVIDERS = {
     "Arcee AI": {"url": "https://api.arcee.ai/v1/chat/completions", "env_key": "ARCEE_API_KEY"}
 }
 
-# Default models per provider for the dashboard dropdown
 DEFAULT_MODELS = {
     "Cerebras Cloud": "llama-4-scout-17b-16e-instruct",
     "GroqCloud": "llama-3.3-70b-versatile",
     "SambaNova Cloud": "Meta-Llama-3.3-70B-Instruct",
-    "Google AI Studio": "gemini-2.5-flash",
+    "Google AI Studio": "gemini-3-flash-preview",
     "Mistral AI": "mistral-small-latest",
     "xAI": "grok-3-mini-fast",
     "NVIDIA NIM": "meta/llama-3.3-70b-instruct",
@@ -76,7 +74,6 @@ DEFAULT_MODELS = {
 
 @app.get("/providers")
 def list_providers():
-    """Returns all providers, their key status, and default model."""
     result = []
     for name, config in PROVIDERS.items():
         has_key = bool(os.getenv(config["env_key"]))
@@ -87,6 +84,35 @@ def list_providers():
         })
     return {"providers": result}
 
+def execute_request_with_backoff(url, headers, payload, max_retries=4):
+    """Shields upstream local agents from transient cloud failures."""
+    base_delay = 1
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=45)
+            if response.status_code in [429, 503]:
+                response.raise_for_status() 
+            response.raise_for_status()
+            return response.json()
+            
+        except requests.exceptions.RequestException as e:
+            is_rate_limit = False
+            if e.response is not None and e.response.status_code in [429, 503]:
+                is_rate_limit = True
+                
+            if attempt == max_retries - 1:
+                error_msg = e.response.text if e.response is not None else str(e)
+                raise HTTPException(status_code=500, detail=f"Provider Connection Failed after {max_retries} retries: {error_msg}")
+                
+            if is_rate_limit:
+                jitter = random.uniform(0, 1)
+                delay = (base_delay * (2 ** attempt)) + jitter
+                print(f"[ROUTER THROTTLE] Waiting {delay:.2f}s before retry...")
+                time.sleep(delay)
+            else:
+                error_msg = e.response.text if e.response is not None else str(e)
+                raise HTTPException(status_code=e.response.status_code if e.response else 500, detail=f"Provider Error: {error_msg}")
+
 @app.post("/chat")
 def route_chat(req: ChatRequest):
     if req.provider not in PROVIDERS:
@@ -96,14 +122,13 @@ def route_chat(req: ChatRequest):
     api_key = os.getenv(provider_config["env_key"])
     
     if not api_key:
-        raise HTTPException(status_code=401, detail=f"Missing API key in .env for {req.provider}. Variable {provider_config['env_key']} is empty.")
+        raise HTTPException(status_code=401, detail=f"Missing API key in .env for {req.provider}.")
 
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}"
     }
 
-    # Mandatory anti-abuse headers for OpenRouter
     if req.provider == "OpenRouter":
         headers["HTTP-Referer"] = "http://127.0.0.1:8090"
         headers["X-Title"] = "DSIE Codex Core"
@@ -114,13 +139,7 @@ def route_chat(req: ChatRequest):
         "temperature": req.temperature
     }
 
-    try:
-        response = requests.post(provider_config["url"], headers=headers, json=payload, timeout=45)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        error_msg = e.response.text if e.response is not None else str(e)
-        raise HTTPException(status_code=500, detail=f"Provider Connection Failed: {error_msg}")
+    return execute_request_with_backoff(provider_config["url"], headers, payload)
 
 if __name__ == "__main__":
     import uvicorn

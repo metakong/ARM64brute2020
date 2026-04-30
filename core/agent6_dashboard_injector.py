@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import tempfile
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 INDEX_PATH = str(BASE_DIR / 'dashboard' / 'index.html')
@@ -10,8 +11,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DSIE Codex | CEO Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script src="https://unpkg.com/pocketbase/dist/pocketbase.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #1f2937; }
@@ -195,16 +197,28 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             const reader = document.getElementById('article-reader');
             reader.classList.remove('hidden');
             document.getElementById('reader-pillar').innerText = article.Pillar;
-            const content = article['Longform Markdown Article Text'].replace(/\\\\n/g, '<br>').replace(/\\n/g, '<br>');
+            
+            // UPDATED: Convert escaped newlines back to actual newlines for the parser
+            let rawMarkdown = article['Longform Markdown Article Text'].replace(/\\\\n/g, '\\n');
+            
+            // UPDATED: Use Marked.js to parse the Markdown into beautiful HTML
+            const htmlContent = marked.parse(rawMarkdown);
+            
             document.getElementById('reader-content').innerHTML = `
-                <h1 class="text-xl font-bold mb-6 text-white border-b border-gray-800 pb-4">${article['UI Headline']}</h1>
-                <div class="text-sm leading-7 space-y-4">${content}</div>
+                <h1 class="text-2xl font-bold mb-6 text-white border-b border-gray-800 pb-4">${article['UI Headline']}</h1>
+                <div class="space-y-4">${htmlContent}</div>
             `;
         }
 
         function closeReader() { document.getElementById('article-reader').classList.add('hidden'); }
 
         // --- LIVE COMMS: SSE REALTIME ENGINE ---
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
         function appendTranscript(role, text, timestamp) {
             const container = document.getElementById('feed-container');
             const bubble = document.createElement('div');
@@ -221,13 +235,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                         ? 'bg-blue-900/40 border border-blue-700/50 text-blue-100'
                         : 'bg-green-900/40 border border-green-700/50 text-green-100'
                 } shadow-lg">
-                    ${text}
+                    ${escapeHtml(text)}
                 </div>
             `;
             container.appendChild(bubble);
             container.scrollTop = container.scrollHeight;
 
-            // Update Qwen badge activity
             if (!isCEO) {
                 const badge = document.getElementById('qwen-badge');
                 badge.innerText = 'ACTIVE';
@@ -259,7 +272,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     const clientId = data.clientId;
                     statusEl.innerHTML = '<span class="text-green-400">● LIVE</span>';
 
-                    // Subscribe to the transcripts collection
                     fetch('http://127.0.0.1:8090/api/realtime', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -302,10 +314,27 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 </html>"""
 
 def fix_dashboard():
-    print("[AGENT 6] Executing Complete File Overwrite...")
-    with open(INDEX_PATH, 'w', encoding='utf-8') as f:
-        f.write(DASHBOARD_HTML)
-    print(f"[SUCCESS] Dashboard index.html has been completely wiped and fixed.")
+    print("\n==================================================")
+    print("[AGENT 6] Booting Dashboard Injector...")
+    
+    # 1. FAILSAGE: Ensure the directory exists before trying to write to it
+    os.makedirs(os.path.dirname(INDEX_PATH), exist_ok=True)
+    
+    # 2. ATOMIC WRITE: Protect the HTML file from corruption during the millisecond it takes to write
+    print("[SYSTEM] Executing Atomic Overwrite of index.html...")
+    
+    # Create a temporary file in the same directory to avoid cross-drive move issues
+    fd, temp_path = tempfile.mkstemp(dir=os.path.dirname(INDEX_PATH), text=True)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.write(DASHBOARD_HTML)
+        # Instantly swap the temp file over the real file (Atomic action)
+        os.replace(temp_path, INDEX_PATH)
+        print(f"[SUCCESS] Dashboard injected and secured at {INDEX_PATH}")
+    except Exception as e:
+        print(f"[FATAL] Failed to write dashboard: {e}")
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 if __name__ == "__main__":
     fix_dashboard()

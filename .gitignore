@@ -22,6 +22,7 @@ bus/pocketbase/pb_data/
 
 # Secrets & Credentials (CRITICAL)
 .env
+.env.encrypted
 token.json
 client_secret.json
 dsie-codex-llc-*.json

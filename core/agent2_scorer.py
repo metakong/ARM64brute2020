@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+from dsie_utils import log_action, execute_with_backoff, clean_json_response, GEMINI_MODEL
+
 # --- CONFIGURATION ---
 load_dotenv(str(BASE_DIR / '.env'))
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
@@ -24,26 +26,6 @@ BATCH_SIZE = 20  # Batching to avoid Gemini 15 RPM Free Tier limits
 
 os.makedirs(os.path.dirname(SCORED_LOG_PATH), exist_ok=True)
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-
-def log_action(message):
-    print(message)
-    with open(LOG_FILE, 'a', encoding='utf-8') as f:
-        f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} | {message}\n")
-
-def execute_with_backoff(func, *args, max_retries=5, **kwargs):
-    """Exponential backoff for API rate limits."""
-    base_delay = 5
-    for attempt in range(max_retries):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            if attempt == max_retries - 1:
-                log_action(f"     [FATAL] Max retries reached: {e}")
-                raise e
-            jitter = random.uniform(0, 1)
-            delay = (base_delay * (2 ** attempt)) + jitter
-            log_action(f"     [API THROTTLE/ERROR] Waiting {delay:.2f}s... ({str(e)[:50]})")
-            time.sleep(delay)
 
 def score_batch_with_gemini(article_batch):
     """Sends a batch of 20 articles to Gemini to be scored simultaneously."""
@@ -100,7 +82,7 @@ Return ONLY a raw JSON array of objects. Do not include markdown formatting or c
     
     def _generate():
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=GEMINI_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -108,36 +90,26 @@ Return ONLY a raw JSON array of objects. Do not include markdown formatting or c
             )
         )
         
-        clean_text = response.text.strip()
-        # Clean any accidental markdown formatting robustly
-        if clean_text.startswith("```"):
-            lines = clean_text.split('\n')
-            if lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines[-1].startswith("```"):
-                lines = lines[:-1]
-            clean_text = '\n'.join(lines).strip()
-            
-        return json.loads(clean_text)
+        return json.loads(clean_json_response(response.text))
         
     return execute_with_backoff(_generate)
 
 def run_scorer_agent():
-    log_action("\n" + "="*50)
-    log_action(f"[AGENT 2] Booting The Scorer (Threshold: {SCORE_THRESHOLD}+)...")
+    log_action("\n" + "="*50, LOG_FILE)
+    log_action(f"[AGENT 2] Booting The Scorer (Threshold: {SCORE_THRESHOLD}+)...", LOG_FILE)
     
     if not os.path.exists(INTAKE_QUEUE_PATH):
-        log_action("[FATAL] Intake queue not found. Did Agent 1 run?")
+        log_action("[FATAL] Intake queue not found. Did Agent 1 run?", LOG_FILE)
         return
         
     with open(INTAKE_QUEUE_PATH, 'r', encoding='utf-8') as f:
         morning_intake = json.load(f)
         
     if not morning_intake:
-        log_action("[SYSTEM] Intake queue is empty. Exiting.")
+        log_action("[SYSTEM] Intake queue is empty. Exiting.", LOG_FILE)
         return
 
-    log_action(f"[SYSTEM] Loaded {len(morning_intake)} articles. Commencing Batch Scoring...")
+    log_action(f"[SYSTEM] Loaded {len(morning_intake)} articles. Commencing Batch Scoring...", LOG_FILE)
     
     all_scored_articles = []
     winning_articles = []
@@ -147,7 +119,7 @@ def run_scorer_agent():
         batch_num = (i // BATCH_SIZE) + 1
         total_batches = (len(morning_intake) - 1) // BATCH_SIZE + 1
         
-        log_action(f"  -> Scoring Batch {batch_num}/{total_batches} ({len(batch)} articles)...")
+        log_action(f"  -> Scoring Batch {batch_num}/{total_batches} ({len(batch)} articles)...", LOG_FILE)
         
         try:
             batch_results = score_batch_with_gemini(batch)
@@ -168,14 +140,14 @@ def run_scorer_agent():
                     all_scored_articles.append(scored_record)
                     
                     if score >= SCORE_THRESHOLD:
-                        log_action(f"     [WINNER: {score}/100] {article['title'][:60]}...")
+                        log_action(f"     [WINNER: {score}/100] {article['title'][:60]}...", LOG_FILE)
                         winning_articles.append(scored_record)
             
             # Artificial delay to respect Gemini API RPM limits for Free Tier
             time.sleep(5)
             
         except Exception as e:
-            log_action(f"     [ERROR] Batch {batch_num} failed: {e}")
+            log_action(f"     [ERROR] Batch {batch_num} failed: {e}", LOG_FILE)
 
     # Save outputs
     with open(SCORED_LOG_PATH, 'w', encoding='utf-8') as f:
@@ -184,12 +156,12 @@ def run_scorer_agent():
     with open(WINNING_URLS_PATH, 'w', encoding='utf-8') as f:
         json.dump(winning_articles, f, indent=4)
         
-    log_action(f"\n[SUCCESS] Agent 2 complete.")
-    log_action(f"  -> Processed: {len(all_scored_articles)}")
-    log_action(f"  -> Winners ({SCORE_THRESHOLD}+): {len(winning_articles)}")
-    log_action(f"  -> Rejected: {len(all_scored_articles) - len(winning_articles)}")
-    log_action(f"[SYSTEM] Scored log: {SCORED_LOG_PATH}")
-    log_action(f"[SYSTEM] Handoff ready: {WINNING_URLS_PATH}")
+    log_action(f"\n[SUCCESS] Agent 2 complete.", LOG_FILE)
+    log_action(f"  -> Processed: {len(all_scored_articles)}", LOG_FILE)
+    log_action(f"  -> Winners ({SCORE_THRESHOLD}+): {len(winning_articles)}", LOG_FILE)
+    log_action(f"  -> Rejected: {len(all_scored_articles) - len(winning_articles)}", LOG_FILE)
+    log_action(f"[SYSTEM] Scored log: {SCORED_LOG_PATH}", LOG_FILE)
+    log_action(f"[SYSTEM] Handoff ready: {WINNING_URLS_PATH}", LOG_FILE)
 
 if __name__ == "__main__":
     run_scorer_agent()
