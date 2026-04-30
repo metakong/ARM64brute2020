@@ -1,12 +1,15 @@
-﻿annotated-types==0.7.0
+﻿annotated-doc==0.0.4
+annotated-types==0.7.0
 anyio==4.13.0
 certifi==2026.4.22
 cffi==2.0.0
 charset-normalizer==3.4.7
+click==8.3.3
 cmake==4.3.2
 colorama==0.4.6
 coloredlogs==15.0.1
 distro==1.9.0
+fastapi==0.136.1
 flatbuffers==25.12.19
 foundry-local-core==1.0.0
 # Editable install with no version control (foundry-local-sdk==0.9.0.dev0)
@@ -32,14 +35,17 @@ pycparser==3.0
 pydantic==2.13.3
 pydantic_core==2.46.3
 pyreadline3==3.5.4
+python-dotenv==1.2.2
 requests==2.33.1
 setuptools==82.0.1
 sherpa_onnx==1.13.0
 sniffio==1.3.1
 sounddevice==0.5.5
+starlette==1.0.0
 sympy==1.14.0
 tqdm==4.67.3
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 urllib3==2.6.3
+uvicorn==0.46.0
 wheel==0.47.0
