@@ -38,3 +38,7 @@ phase2_sprint_report.md
 backend_brainstorming/
 
 secrets/
+
+# Node & Tauri
+node_modules/
+dashboard/src-tauri/target/
