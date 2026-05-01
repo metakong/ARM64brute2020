@@ -16,6 +16,11 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
+# MCP Nexus Integration
+import asyncio
+import gc
+from mcp_nexus import initialize_nexus, call_mcp_tool, get_tools_for_llm, shutdown_nexus
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # 1. Map Cache & Ephemeral Storage (SSD Protection)
@@ -83,6 +88,9 @@ class DSIECore:
         self.mic_index = get_optimal_mic_index()
         self.llm_model = None
         self.whisper_model = None
+        
+        # Initialize MCP Nexus Connections
+        asyncio.run(initialize_nexus())
 
     def load_hardware(self):
         print("[SYSTEM] Syncing Models with Native SDK Registry...")
@@ -250,14 +258,59 @@ class DSIECore:
                             self.speak("Cloud connection failed. I cannot retrieve that data right now.")
                             
                     else:
-                        sys_prompt = f"""PRIMARY DIRECTIVE: You are the local voice dispatcher for the DSIE Codex OS.
-Current Date: {current_date}
-Respond to the user's statement or command briefly and conversationally."""
-
-                        response = self.chat_client.complete_chat([
+                        sys_prompt = f"PRIMARY DIRECTIVE: You are the local voice dispatcher for the DSIE Codex OS. Today is {current_date}. Respond briefly and conversationally."
+                        messages = [
                             {"role": "system", "content": sys_prompt},
                             {"role": "user", "content": clean_text}
-                        ])
+                        ]
+
+                        # Map MCP Tools to MSFL OpenAI Schema
+                        available_mcp_tools = get_tools_for_llm()
+                        tools = [{"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.inputSchema}} for t in available_mcp_tools]
+
+                        # Phase 1: Initial Inference with Tooling Enabled
+                        response = self.chat_client.complete_chat(messages, tools=tools)
+                        
+                        # Phase 2: Tool Execution Loop (Interception)
+                        if response.choices[0].message.tool_calls:
+                            # Append the assistant's tool-call request to the message history
+                            # We convert the message object back to a dict for the SDK
+                            assistant_msg = {
+                                "role": "assistant",
+                                "content": response.choices[0].message.content,
+                                "tool_calls": [
+                                    {
+                                        "id": tc.id,
+                                        "type": "function",
+                                        "function": {
+                                            "name": tc.function.name,
+                                            "arguments": tc.function.arguments
+                                        }
+                                    } for tc in response.choices[0].message.tool_calls
+                                ]
+                            }
+                            messages.append(assistant_msg)
+
+                            for tool_call in response.choices[0].message.tool_calls:
+                                tool_name = tool_call.function.name
+                                tool_args = json.loads(tool_call.function.arguments)
+                                
+                                print(f"  [MCP EXECUTE] Calling: {tool_name}({tool_call.function.arguments})")
+                                tool_result = asyncio.run(call_mcp_tool(tool_name, tool_args))
+
+                                # Append the result as a Tool role message
+                                messages.append({
+                                    "role": "tool",
+                                    "tool_call_id": tool_call.id,
+                                    "content": str(tool_result)
+                                })
+
+                                # SOP-01: Aggressive Memory Purge before re-inference
+                                gc.collect()
+
+                            # Phase 3: Final Synthesis (Second Inference Pass)
+                            response = self.chat_client.complete_chat(messages) # No tools on second pass
+
                         reply = response.choices[0].message.content.strip()
                         
                         self.push_transcript("CEO", clean_text)
@@ -268,11 +321,15 @@ Respond to the user's statement or command briefly and conversationally."""
                     print(f"[!] Runtime Error: {e}")
 
     def shutdown(self):
-        print("\n[SYSTEM] Releasing NPU...")
+        print("\n[SYSTEM] Releasing NPU & MCP Nexus...")
         if hasattr(self, 'chat_client'): del self.chat_client
         if hasattr(self, 'audio_client'): del self.audio_client
         if self.llm_model: self.llm_model.unload()
         if self.whisper_model: self.whisper_model.unload()
+        try:
+            asyncio.run(shutdown_nexus())
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     core = DSIECore()

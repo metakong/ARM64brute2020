@@ -104,3 +104,14 @@ This repository has undergone a security hardening phase (Operation Ironclad). K
 - **Path Remediation**: All agents and core utilities have been updated to target the secure vault location.
 - **Infrastructure Hardening**: Git ignore policies have been enforced to prevent accidental exposure of local configuration files.
 - **NPU Optimization**: Validated local hardware execution paths for Qualcomm Hexagon NPU acceleration.
+
+---
+### Architect's Log: The Edge Node Evolves
+**Date:** May 2026
+**Update: MCP Nexus NPU Wiring & The 8GB RAM Survival Guide**
+
+While the rest of the industry is setting VC funding on fire paying for cloud compute to read a database, we just wired the 2026 MSFL tool-calling schema directly into the local Hexagon NPU. 
+
+We successfully injected a two-phase asynchronous interception loop into `dsie_core.py`. When the local Qwen 4B model realizes it lacks context, it pauses inference, queries the local PocketBase SQLite vault via `stdio` using our custom MCP Nexus router, pulls the data, and synthesizes an answer. 
+
+And because we are running this entire cognitive bus on an ARM64 Snapdragon with 8GB of RAM, we are explicitly forcing `gc.collect()` after every single tool execution. Memory management isn't a suggestion on edge hardware; it's the law. The audio routing through SAPI5 remains flawless, proving that you don't need a server rack to build an ambient business partner—you just need ruthless optimization and the willingness to bypass the Microsoft SDK's guardrails.
