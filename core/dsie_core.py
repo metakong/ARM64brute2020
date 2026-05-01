@@ -20,6 +20,7 @@ from google.genai import types
 import asyncio
 import gc
 from mcp_nexus import initialize_nexus, call_mcp_tool, get_tools_for_llm, shutdown_nexus
+from tools.intent_logger import log_intent
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -258,23 +259,50 @@ class DSIECore:
                             self.speak("Cloud connection failed. I cannot retrieve that data right now.")
                             
                     else:
-                        sys_prompt = f"PRIMARY DIRECTIVE: You are the local voice dispatcher for the DSIE Codex OS. Today is {current_date}. Respond briefly and conversationally."
+                        # ==========================================
+                        # VANGUARD ROUTER LOGIC
+                        # ==========================================
+                        routing_decision = "Local"
+                        first_10_words = " ".join(words[:10]).lower()
+                        triggers = ["cloud", "gemini", "complex", "analyze", "code", "search", "database"]
+                        
+                        force_cloud = any(t in first_10_words for t in triggers)
+                        if force_cloud:
+                            routing_decision = "Cloud"
+                            print(f"  [ROUTER] Trigger detected in first 10 words. Forcing Cloud Vanguard.")
+
+                        log_intent(clean_text, routing_decision)
+
+                        capability_schema = f"""
+                        DOMAIN: Edge Routing / Status Notification.
+                        CONSTRAINTS: 4B Parameter limit. No local file access.
+                        GOAL: Analyze intent. Today is {current_date}. 
+                        If the user request is complex or matches your trigger list, use the delegate_to_gemini tool.
+                        """
+                        
                         messages = [
-                            {"role": "system", "content": sys_prompt},
+                            {"role": "system", "content": capability_schema},
                             {"role": "user", "content": clean_text}
                         ]
 
-                        # Map MCP Tools to MSFL OpenAI Schema
+                        # Map MCP Tools
                         available_mcp_tools = get_tools_for_llm()
                         tools = [{"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.inputSchema}} for t in available_mcp_tools]
 
-                        # Phase 1: Initial Inference with Tooling Enabled
-                        response = self.chat_client.complete_chat(messages, tools=tools)
+                        # Force delegate_to_gemini if cloud trigger was hit
+                        tool_choice = {"type": "function", "function": {"name": "delegate_to_gemini"}} if force_cloud else "auto"
+
+                        # Phase 1: Initial Inference
+                        response = self.chat_client.complete_chat(messages, tools=tools, tool_choice=tool_choice)
                         
-                        # Phase 2: Tool Execution Loop (Interception)
+                        # Phase 2: Tool Execution & Vocal Heartbeat
+                        prefix = "[SOP-Active]"
                         if response.choices[0].message.tool_calls:
-                            # Append the assistant's tool-call request to the message history
-                            # We convert the message object back to a dict for the SDK
+                            # Vocal Heartbeat
+                            tool_names = [tc.function.name for tc in response.choices[0].message.tool_calls]
+                            desc = f"Routing to {', '.join(tool_names)}"
+                            self.speak(f"[SOP-Active] -> {desc}")
+
                             assistant_msg = {
                                 "role": "assistant",
                                 "content": response.choices[0].message.content,
@@ -298,23 +326,25 @@ class DSIECore:
                                 print(f"  [MCP EXECUTE] Calling: {tool_name}({tool_call.function.arguments})")
                                 tool_result = asyncio.run(call_mcp_tool(tool_name, tool_args))
 
-                                # Append the result as a Tool role message
+                                if tool_name == "delegate_to_gemini":
+                                    prefix = "[Vanguard-Result]"
+
                                 messages.append({
                                     "role": "tool",
                                     "tool_call_id": tool_call.id,
                                     "content": str(tool_result)
                                 })
-
-                                # SOP-01: Aggressive Memory Purge before re-inference
                                 gc.collect()
 
-                            # Phase 3: Final Synthesis (Second Inference Pass)
-                            response = self.chat_client.complete_chat(messages) # No tools on second pass
+                            # Phase 3: Final Synthesis
+                            response = self.chat_client.complete_chat(messages)
+                        else:
+                            prefix = "[Local-FreeStyle]"
 
-                        reply = response.choices[0].message.content.strip()
+                        reply = f"{prefix} {response.choices[0].message.content.strip()}"
                         
                         self.push_transcript("CEO", clean_text)
-                        self.push_transcript("Codex (Local)", reply)
+                        self.push_transcript("Codex", reply)
                         self.speak(reply)
 
                 except Exception as e:

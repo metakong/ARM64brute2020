@@ -108,10 +108,10 @@ This repository has undergone a security hardening phase (Operation Ironclad). K
 ---
 ### Architect's Log: The Edge Node Evolves
 **Date:** May 2026
-**Update: MCP Nexus NPU Wiring & The 8GB RAM Survival Guide**
+**Update: Vanguard-Router Convergence & The Vocal Leash**
 
-While the rest of the industry is setting VC funding on fire paying for cloud compute to read a database, we just wired the 2026 MSFL tool-calling schema directly into the local Hexagon NPU. 
+We just successfully implemented a decoupled Cloud Delegation architecture. The local Qwen 4B model has been neutered into a pure "Status Router." It no longer attempts to hallucinate its way through complex logic it wasn't built for. 
 
-We successfully injected a two-phase asynchronous interception loop into `dsie_core.py`. When the local Qwen 4B model realizes it lacks context, it pauses inference, queries the local PocketBase SQLite vault via `stdio` using our custom MCP Nexus router, pulls the data, and synthesizes an answer. 
+Instead, we deployed a standalone Gemini 3 Flash "Vanguard" MCP server. The local router now scans every interaction for triggers (Cloud, Gemini, Complex, etc.). If detected, it immediately hands off the task to the cloud-tier intelligence via our cognitive bus. 
 
-And because we are running this entire cognitive bus on an ARM64 Snapdragon with 8GB of RAM, we are explicitly forcing `gc.collect()` after every single tool execution. Memory management isn't a suggestion on edge hardware; it's the law. The audio routing through SAPI5 remains flawless, proving that you don't need a server rack to build an ambient business partner—you just need ruthless optimization and the willingness to bypass the Microsoft SDK's guardrails.
+We also enforced the "Vocal Heartbeat" protocol. The assistant now explicitly states what it's doing ([SOP-Active] -> Routing to Cloud Vanguard) before delegating, providing full transparency in the tool-call interception loop. Intent logging is now live, capturing every routing decision for future model fine-tuning. This is how you run a professional edge node: ruthless intent analysis, zero wasted tokens, and absolute hardware control.

@@ -39,6 +39,10 @@ async def initialize_nexus():
         "PocketBase Vault": StdioServerParameters(
             command=r"Z:\foundry_project\venv\Scripts\python.exe",
             args=[r"Z:\foundry_project\core\pb_mcp.py"]
+        ),
+        "Cloud Vanguard": StdioServerParameters(
+            command=r"Z:\foundry_project\venv\Scripts\python.exe",
+            args=[r"Z:\foundry_project\core\api_mcp.py"]
         )
     }
 
