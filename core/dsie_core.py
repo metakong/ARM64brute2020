@@ -185,6 +185,9 @@ class DSIECore:
         SOP-04 (Context Hydration): If the user's prompt implies "working theory", "SOP", "rules", or "business logic", 
         you MUST execute fetch_business_sop to retrieve the local context. 
         Once retrieved, you MUST include that context in your payload when triggering delegate_to_gemini.
+
+        SOP-05 (Asynchronous Handoff): If the user's prompt requests a deep research report, a long-running scrape, or contains "Background", 
+        you MUST immediately acknowledge the handoff by speaking: "[SOP-Active] Dispatching task to the background queue."
         
         If the user request is complex or matches your trigger list, use the delegate_to_gemini tool.
         """

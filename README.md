@@ -108,8 +108,8 @@ This repository has undergone a security hardening phase (Operation Ironclad). K
 ---
 ### Architect's Log: The Edge Node Evolves
 **Date:** May 2026
-**Update: Omni-Pane Bridge & JIT Context Hydration**
+**Update: Severing the HTTP Thread for Asynchronous Edge Intelligence**
 
-We just bypassed the complexity of pure websocket overhead by implementing a native SSE-backed command bridge. The dashboard now features an "Omni-Pane" input area that hits a specialized FastAPI REST endpoint on the Mercenary Router. This endpoint bridges directly to the `dsie_core` NPU inference engine, allowing for direct CEO-to-Bus text injection.
+We just implemented a decoupled, asynchronous cognitive queue to handle high-latency research tasks without locking the UI. By leveraging FastAPI's `BackgroundTasks`, we've effectively severed the synchronous HTTP thread for complex Vanguard-tier requests. 
 
-Furthermore, we've implemented **Just-In-Time (JIT) Context Hydration**. Unlike naive RAG systems that bloat your vector DB with useless noise, our router now detects when business logic or SOPs are required. It dynamically triggers the GDrive MCP to fetch targeted documentation, hydrates the prompt with fresh context, and delegates the heavy lifting to the Cloud Vanguard. We are effectively running a "cognitive cache" that only loads what is necessary for the current task. Memory efficiency isn't just about RAM; it's about context relevance. 
+When a user triggers a "Deep Scrape" or "Background Research" task, the router now generates a unique `task_id`, pushes a `[Queue-Active]` acknowledgement to the cognitive bus, and immediately returns a `202 Accepted` status. The NPU then executes the intent analysis and cloud delegation in the background, pushing the final `[Vanguard-Result]` once synthesized. The dashboard now features a real-time "Queue Status" indicator that tracks these background synapses. This is how you scale intelligence on 8GB of RAM: stop waiting for the cloud to reply and start queuing the next task.

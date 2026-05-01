@@ -24,7 +24,10 @@
                 <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse" id="global-pulse"></div>
                 <h1 class="text-xl font-bold tracking-widest text-white">DSIE CODEX <span class="text-gray-400 text-sm">| DASHBOARD</span></h1>
             </div>
-            <div class="text-sm text-gray-400" id="connection-status">Connecting to Bus...</div>
+            <div class="text-sm text-gray-400 flex items-center space-x-4">
+                <div id="connection-status">Connecting to Bus...</div>
+                <div id="queue-status" class="hidden text-yellow-500 text-xs font-bold animate-pulse">⟳ Processing Background Task...</div>
+            </div>
         </div>
         <div class="flex space-x-6 px-6 bg-gray-800/80 text-sm font-semibold tracking-wider">
             <button id="btn-bus" onclick="switchView('bus')" class="pb-2 tab-active transition-colors uppercase">Cognitive Bus (Local)</button>
@@ -279,6 +282,14 @@
                     if (payload.action === 'create' && payload.record) {
                         const r = payload.record;
                         appendTranscript(r.role || 'Codex', r.text || '', r.created);
+
+                        // Queue UI Logic: Show/Hide background task indicator
+                        const queueIndicator = document.getElementById('queue-status');
+                        if (r.text && r.text.includes('[Queue-Active]')) {
+                            queueIndicator.classList.remove('hidden');
+                        } else if (r.text && r.text.includes('[Vanguard-Result]')) {
+                            queueIndicator.classList.add('hidden');
+                        }
                     }
                 } catch(err) { console.error('[SSE] Transcript parse error:', err); }
             });

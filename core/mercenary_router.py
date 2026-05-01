@@ -2,7 +2,10 @@ import os
 import time
 import random
 import requests
-from fastapi import FastAPI, HTTPException
+import asyncio
+import uuid
+import gc
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -32,6 +35,19 @@ def get_dsie():
         _dsie = DSIECore()
         _dsie.load_hardware()
     return _dsie
+
+async def process_background_task(task_id: str, prompt: str):
+    """Worker function for asynchronous NPU-Cloud handoff."""
+    try:
+        core = get_dsie()
+        # The prompt is processed through the standard pipeline (Local -> MCP -> Vanguard)
+        reply = core.process_text(prompt)
+        # Ensure the final result is pushed with the Vanguard tag
+        core.push_transcript("Codex", f"[Vanguard-Result] (ID: {task_id}) {reply}")
+    except Exception as e:
+        print(f"[BACKGROUND ERROR] Task {task_id} failed: {e}")
+    finally:
+        gc.collect()
 
 class PromptRequest(BaseModel):
     prompt: str
@@ -160,12 +176,30 @@ def route_chat(req: ChatRequest):
     return execute_request_with_backoff(provider_config["url"], headers, payload)
 
 @app.post("/api/chat")
-def omni_chat(req: PromptRequest):
+async def omni_chat(req: PromptRequest, background_tasks: BackgroundTasks):
     """Bridges the UI input area to the local DSIE Core inference engine."""
+    prompt = req.prompt
+    triggers = ["deep", "scrape", "background", "queue", "asynchronous"]
+    
+    if any(t in prompt.lower() for t in triggers):
+        task_id = str(uuid.uuid4())[:8]
+        core = get_dsie()
+        
+        # 1. Immediate ACK to PocketBase and TTS
+        ack_msg = f"[Queue-Active] Task {task_id} dispatched. Awaiting background resolution..."
+        core.push_transcript("Codex", ack_msg)
+        core.speak("Dispatching task to the background queue.")
+        
+        # 2. Hand off to background worker
+        background_tasks.add_task(process_background_task, task_id, prompt)
+        
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=202, content={"status": "accepted", "task_id": task_id})
+
     try:
         core = get_dsie()
         # process_text handles PocketBase pushes and TTS natively
-        reply = core.process_text(req.prompt)
+        reply = core.process_text(prompt)
         return {"status": "success", "reply": reply}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
