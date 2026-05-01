@@ -172,7 +172,7 @@ class DSIECore:
         # ==========================================
         routing_decision = "Local"
         first_10_words = " ".join(words[:10]).lower()
-        triggers = ["cloud", "gemini", "complex", "analyze", "code", "search", "database"]
+        triggers = ["cloud", "gemini", "complex", "analyze", "code", "search", "database", "web", "internet", "osint", "news", "current"]
         force_cloud = any(t in first_10_words for t in triggers)
         
         log_intent(clean_text, routing_decision if not force_cloud else "Cloud")
@@ -188,6 +188,10 @@ class DSIECore:
 
         SOP-05 (Asynchronous Handoff): If the user's prompt requests a deep research report, a long-running scrape, or contains "Background", 
         you MUST immediately acknowledge the handoff by speaking: "[SOP-Active] Dispatching task to the background queue."
+
+        SOP-06 (OSINT Chaining): If the user's prompt requests current data, news, or explicitly asks to "search the web", 
+        you MUST first call osint_scrape to gather raw internet data. 
+        Once the data is retrieved, you MUST package that raw data into the payload for delegate_to_gemini and dispatch it to the background queue.
         
         If the user request is complex or matches your trigger list, use the delegate_to_gemini tool.
         """

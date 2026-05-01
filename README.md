@@ -108,8 +108,8 @@ This repository has undergone a security hardening phase (Operation Ironclad). K
 ---
 ### Architect's Log: The Edge Node Evolves
 **Date:** May 2026
-**Update: Severing the HTTP Thread for Asynchronous Edge Intelligence**
+**Update: OSINT Deep Research & Zero-Dependency Scaping**
 
-We just implemented a decoupled, asynchronous cognitive queue to handle high-latency research tasks without locking the UI. By leveraging FastAPI's `BackgroundTasks`, we've effectively severed the synchronous HTTP thread for complex Vanguard-tier requests. 
+We've officially severed our dependence on bloated third-party scraping libraries. The new **OSINT Research Node** is a bare-metal MCP server written using only the Python standard library. No BeautifulSoup, no Selenium, no overhead. Just raw `urllib` and a custom `HTMLParser` to strip the noise and extract the signal.
 
-When a user triggers a "Deep Scrape" or "Background Research" task, the router now generates a unique `task_id`, pushes a `[Queue-Active]` acknowledgement to the cognitive bus, and immediately returns a `202 Accepted` status. The NPU then executes the intent analysis and cloud delegation in the background, pushing the final `[Vanguard-Result]` once synthesized. The dashboard now features a real-time "Queue Status" indicator that tracks these background synapses. This is how you scale intelligence on 8GB of RAM: stop waiting for the cloud to reply and start queuing the next task.
+We've implemented **SOP-06 (OSINT Chaining)**: the local Qwen router now proactively triggers a web scrape when it detects a request for current events or internet-based data. This raw intel is then piped directly into the Cloud Vanguard's cognitive payload. By performing the heavy research on the edge and using the cloud only for final synthesis, we've achieved a research loop that is both cost-effective and hardware-resilient. This is how you build a professional intelligence node: ruthless efficiency, zero bloat, and absolute control over the DOM. 

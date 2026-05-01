@@ -43,6 +43,10 @@ async def initialize_nexus():
         "Cloud Vanguard": StdioServerParameters(
             command=r"Z:\foundry_project\venv\Scripts\python.exe",
             args=[r"Z:\foundry_project\core\api_mcp.py"]
+        ),
+        "OSINT Node": StdioServerParameters(
+            command=r"Z:\foundry_project\venv\Scripts\python.exe",
+            args=[r"Z:\foundry_project\core\web_mcp.py"]
         )
     }
 
