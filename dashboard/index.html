@@ -206,6 +206,12 @@
         function closeReader() { document.getElementById('article-reader').classList.add('hidden'); }
 
         // --- LIVE COMMS: SSE REALTIME ENGINE ---
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
         function appendTranscript(role, text, timestamp) {
             const container = document.getElementById('feed-container');
             const bubble = document.createElement('div');
@@ -222,7 +228,7 @@
                         ? 'bg-blue-900/40 border border-blue-700/50 text-blue-100'
                         : 'bg-green-900/40 border border-green-700/50 text-green-100'
                 } shadow-lg">
-                    ${text}
+                    ${escapeHtml(text)}
                 </div>
             `;
             container.appendChild(bubble);

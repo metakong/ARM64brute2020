@@ -96,3 +96,11 @@ OpenAI's Whisper model hallucinates aggressively when fed pure room static (ofte
 This repository is an ongoing exploration of edge computing, model optimization, and autonomous agent orchestration. It proves that with enough patience, a solid understanding of memory mapping, and a willingness to break a few abstraction layers, you can squeeze modern AI performance out of "outdated" silicon. 
 
 **Here's to building systems that work, no matter what the documentation says is "impossible."**
+
+## Security Update (2026-05-01)
+
+This repository has undergone a security hardening phase (Operation Ironclad). Key updates include:
+- **Credential Vaulting**: Sensitive environment variables and API keys have been moved to a localized secrets/ directory.
+- **Path Remediation**: All agents and core utilities have been updated to target the secure vault location.
+- **Infrastructure Hardening**: Git ignore policies have been enforced to prevent accidental exposure of local configuration files.
+- **NPU Optimization**: Validated local hardware execution paths for Qualcomm Hexagon NPU acceleration.

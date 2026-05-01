@@ -24,8 +24,8 @@ GEMINI_API_KEY = os.getenv('GOOGLE_API_KEY')
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 SCOPES = ['https://www.googleapis.com/auth/drive']
-CLIENT_SECRET_FILE = str(BASE_DIR / 'client_secret.json')
-TOKEN_FILE = str(BASE_DIR / 'token.json')
+CLIENT_SECRET_FILE = str(BASE_DIR / 'secrets' / 'client_secret.json')
+TOKEN_FILE = str(BASE_DIR / 'secrets' / 'token.json')
 STATE_FILE = str(BASE_DIR / 'organizer_state.json')
 LOG_FILE = str(BASE_DIR / 'logs' / 'organizer_log.txt')
 BATCH_SIZE = 100

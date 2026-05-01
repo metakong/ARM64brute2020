@@ -1,5 +1,20 @@
 import os
+import sys
+import subprocess
+import time
+import datetime
+import re
+import json
+import requests
+import numpy as np
+import wave
+import sounddevice as sd
 from pathlib import Path
+
+# Native Cloud Integration
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -21,16 +36,6 @@ if os.path.exists(qairt_bin):
     
 os.environ["QAIRT_SDK_ROOT"] = r"Z:\QCDrivers\qairt\2.45.0.260326"
 
-import subprocess
-import time
-import datetime
-import re
-import json
-import requests
-import numpy as np
-import wave
-import sounddevice as sd
-
 from foundry_local_sdk import Configuration, FoundryLocalManager
 from foundry_local_sdk.logging_helper import LogLevel
 
@@ -51,6 +56,15 @@ class DSIECore:
         print("[SYSTEM] Booting DSIE Codex Core (NPU FORCED VIA GLOBAL CONFIG)...")
         log_path = r"Z:\foundry_project\logs"
         os.makedirs(log_path, exist_ok=True)
+        
+        # Load API keys natively to bypass external router dependence for the voice engine
+        load_dotenv(str(BASE_DIR / 'secrets' / '.env'))
+        self.google_api_key = os.getenv('GOOGLE_API_KEY')
+        if self.google_api_key:
+            self.gemini_client = genai.Client(api_key=self.google_api_key)
+        else:
+            print("[WARNING] GOOGLE_API_KEY not found in .env. Cloud handoff disabled.")
+            self.gemini_client = None
         
         config = Configuration(
             app_name="dsie_codex",
@@ -96,13 +110,18 @@ class DSIECore:
             raise
 
     def speak(self, text):
-        clean_text = re.sub(r'[^a-zA-Z0-9\s\.\?\!,]', '', text).strip()
+        clean_text = re.sub(r"[^a-zA-Z0-9\s\.\?\!,'\-]", '', text).strip()
         if not clean_text or len(clean_text) < 2: return
         print(f"\n[CODEX]: {clean_text}")
-        ps_cmd = "Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Speak($args[0])"
-        subprocess.run([POWERSHELL_EXE, "-Command", ps_cmd, clean_text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        ps_cmd = "Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Speak($env:CODEX_SPEECH_TEXT)"
+        
+        custom_env = os.environ.copy()
+        custom_env["CODEX_SPEECH_TEXT"] = clean_text
+        
+        subprocess.run([POWERSHELL_EXE, "-Command", ps_cmd], env=custom_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    def listen(self, filename=TEMP_WAV_PATH, samplerate=16000, threshold=0.03, silence_delay=0.5):
+    def listen(self, filename=TEMP_WAV_PATH, samplerate=16000, threshold=0.03, silence_delay=2.0):
         chunk_samples = int(samplerate * 0.1)
         max_silence_chunks = int(silence_delay / 0.1)
         audio_buffer, is_recording, silence_counter = [], False, 0
@@ -147,7 +166,7 @@ class DSIECore:
         sd.wait()
         vad_threshold = max(np.sqrt(np.mean(recording**2)) * 3.0, 0.05)
 
-        self.speak("System online. Core systems active.")
+        self.speak("System online. Algorithmic Routing active.")
         hallucinations = ["thank you", "watching", "subscribe", "cannot process", "audio file", "i'm sorry", "am sorry", "hear that", "subtitle"]
         
         while True:
@@ -159,11 +178,11 @@ class DSIECore:
                     
                     if len(clean_text) < 2: continue
                     if any(h in lower_text for h in hallucinations) and len(clean_text) < 60:
-                        print(f"--- [AUDIO] Ignored Whisper Hallucination: '{clean_text}'")
                         continue
 
                     print(f"\n[YOU]: {clean_text}")
                     
+                    # Intercept simple operational commands locally to save tokens
                     if lower_text in ["codex shutdown", "codex sleep"]:
                         self.speak("Shutting down. Goodbye, CEO.")
                         self.shutdown()
@@ -175,14 +194,76 @@ class DSIECore:
                         self.speak("Memory secured.")
                         continue
 
-                    response = self.chat_client.complete_chat([
-                        {"role": "system", "content": f"You are Codex. Today is {datetime.datetime.now().strftime('%A, %B %d, %Y')}. Direct answers only."},
-                        {"role": "user", "content": clean_text}
-                    ])
-                    reply = response.choices[0].message.content
-                    self.push_transcript("CEO", clean_text)
-                    self.push_transcript("Codex", reply)
-                    self.speak(reply)
+                    # ==========================================
+                    # ALGORITHMIC WORKLOAD ROUTER (Math-Based Heuristics)
+                    # ==========================================
+                    words = clean_text.split()
+                    word_count = len(words)
+                    digit_count = sum(c.isdigit() for c in clean_text)
+                    
+                    # Word boundaries prevent false positive matches. Added "search" and "look up"
+                    logic_terms = [r"\bif\b", r"\bthen\b", r"\bexcept\b", r"\bassuming\b", r"\bbecause\b", r"\btherefore\b", r"\bcalculate\b", r"\bsolve\b", r"\bdetermine\b", r"\bwhy\b", r"how many", r"\bsearch\b", r"\blook up\b"]
+                    logic_count = sum(len(re.findall(term, lower_text)) for term in logic_terms)
+                    
+                    # The INT4 Mathematical Limits
+                    is_too_long = word_count >= 25
+                    is_too_factual = digit_count >= 3
+                    is_too_logical = logic_count >= 2
+                    is_complex_question = "?" in clean_text and word_count > 6
+                    is_manual_override = "codex query" in lower_text or "codex, query" in lower_text
+                    
+                    requires_cloud = is_too_long or is_too_factual or is_too_logical or is_complex_question or is_manual_override
+
+                    # UX Output so you can see exactly why the math routed it
+                    print(f"  [ROUTER MATH] Words: {word_count}/25 | Digits: {digit_count}/3 | Logic: {logic_count}/2 | Complex ?: {is_complex_question}")
+                    print(f"  [DESTINATION] {'☁️ GEMINI 3 FLASH (with Search)' if requires_cloud else '🖥️ LOCAL QWEN 4B'}")
+
+                    # ==========================================
+                    # EXECUTION LAYER
+                    # ==========================================
+                    current_date = datetime.datetime.now().strftime('%A, %B %d, %Y')
+                    
+                    if requires_cloud:
+                        if not self.gemini_client:
+                            self.speak("Cloud keys are missing. I cannot route this task.")
+                            continue
+
+                        try:
+                            # Search Grounding correctly enabled via official SDK types
+                            cloud_response = self.gemini_client.models.generate_content(
+                                model='gemini-3-flash-preview',
+                                contents=clean_text,
+                                config=types.GenerateContentConfig(
+                                    system_instruction=f"You are the DSIE Codex Cloud Engine. Today is {current_date}. Provide direct, highly accurate, and conversational answers. Keep formatting simple as your response will be read aloud.",
+                                    temperature=0.2,
+                                    tools=[types.Tool(google_search=types.GoogleSearch())]
+                                )
+                            )
+                            cloud_reply = cloud_response.text.strip()
+                            
+                            self.push_transcript("CEO", clean_text)
+                            self.push_transcript("Codex (Gemini)", cloud_reply)
+                            self.speak(cloud_reply)
+                            
+                        except Exception as e:
+                            print(f"[!] Gemini API Failed: {e}")
+                            self.speak("Cloud connection failed. I cannot retrieve that data right now.")
+                            
+                    else:
+                        sys_prompt = f"""PRIMARY DIRECTIVE: You are the local voice dispatcher for the DSIE Codex OS.
+Current Date: {current_date}
+Respond to the user's statement or command briefly and conversationally."""
+
+                        response = self.chat_client.complete_chat([
+                            {"role": "system", "content": sys_prompt},
+                            {"role": "user", "content": clean_text}
+                        ])
+                        reply = response.choices[0].message.content.strip()
+                        
+                        self.push_transcript("CEO", clean_text)
+                        self.push_transcript("Codex (Local)", reply)
+                        self.speak(reply)
+
                 except Exception as e:
                     print(f"[!] Runtime Error: {e}")
 

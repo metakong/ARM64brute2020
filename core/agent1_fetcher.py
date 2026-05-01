@@ -18,8 +18,8 @@ from dsie_utils import log_action
 
 # --- CONFIGURATION ---
 SCOPES = ['https://www.googleapis.com/auth/drive']
-CLIENT_SECRET_FILE = str(BASE_DIR / 'client_secret.json')
-TOKEN_FILE = str(BASE_DIR / 'token.json')
+CLIENT_SECRET_FILE = str(BASE_DIR / 'secrets' / 'client_secret.json')
+TOKEN_FILE = str(BASE_DIR / 'secrets' / 'token.json')
 
 SEED_LIST_PATH = str(BASE_DIR / 'OSINT Seed List Generation.md')
 INTAKE_QUEUE_PATH = str(BASE_DIR / 'dashboard' / 'morning_intake.json')

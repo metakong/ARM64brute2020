@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 CORE_DIR = BASE_DIR / 'core'
 
-load_dotenv(str(BASE_DIR / '.env'))
+load_dotenv(str(BASE_DIR / 'secrets' / '.env'))
 
 LOG_FILE = str(BASE_DIR / 'logs' / 'agent8_orchestrator_log.txt')
 SERVICE_ACCOUNT_FILE = os.getenv('GCP_SERVICE_KEY')

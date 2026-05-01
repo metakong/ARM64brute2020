@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 from dsie_utils import log_action, execute_with_backoff, clean_json_response, GEMINI_MODEL
 
 # --- CONFIGURATION ---
-load_dotenv(str(BASE_DIR / '.env'))
+load_dotenv(str(BASE_DIR / 'secrets' / '.env'))
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 client = genai.Client(api_key=GOOGLE_API_KEY)
 

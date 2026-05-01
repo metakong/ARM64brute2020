@@ -10,7 +10,7 @@ from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
 from dsie_utils import execute_with_backoff
 
-dotenv_path = str(Path(__file__).resolve().parent.parent / '.env')
+dotenv_path = str(Path(__file__).resolve().parent.parent / 'secrets' / '.env')
 load_dotenv(dotenv_path=dotenv_path)
 
 SERVICE_ACCOUNT_FILE = os.getenv('GCP_SERVICE_KEY')

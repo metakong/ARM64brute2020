@@ -13,7 +13,7 @@ from dsie_utils import log_action, execute_with_backoff, clean_json_response, GE
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-load_dotenv(str(BASE_DIR / '.env'))
+load_dotenv(str(BASE_DIR / 'secrets' / '.env'))
 client = genai.Client(api_key=os.getenv('GOOGLE_API_KEY'))
 
 STATE_PATH = str(BASE_DIR / 'dashboard' / 'OSINT_System_State' / 'osint_state.json')
