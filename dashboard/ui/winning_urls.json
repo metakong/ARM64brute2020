@@ -1,0 +1,72 @@
+[
+    {
+        "title": "Introducing NVIDIA Nemotron 3 Nano Omni: Long-Context Multimodal Intelligence for Documents, Audio and Video Agents",
+        "link": "https://huggingface.co/blog/nvidia/nemotron-3-nano-omni-multimodal-intelligence",
+        "source_feed": "https://huggingface.co/blog/feed.xml",
+        "score": 92,
+        "justification": "High-value technical release from NVIDIA regarding multimodal agents and long-context intelligence, directly impacting the user's AI model and agent architecture stack."
+    },
+    {
+        "title": "How to build scalable web apps with OpenAI's Privacy Filter",
+        "link": "https://huggingface.co/blog/openai-privacy-filter-web-apps",
+        "source_feed": "https://huggingface.co/blog/feed.xml",
+        "score": 88,
+        "justification": "Directly addresses technical implementation of privacy filters for OpenAI, a critical requirement for B2B AI integration and data security."
+    },
+    {
+        "title": "Claude Code costs up to $200 a month. Goose does the same thing for free.",
+        "link": "https://venturebeat.com/infrastructure/claude-code-costs-up-to-usd200-a-month-goose-does-the-same-thing-for-free",
+        "source_feed": "https://venturebeat.com/category/ai/feed/",
+        "score": 90,
+        "justification": "Critical technical tooling comparison between Claude Code and open-source alternatives, directly impacting developer workflow and cost management."
+    },
+    {
+        "title": "Salesforce rolls out new Slackbot AI agent as it battles Microsoft and Google in workplace AI",
+        "link": "https://venturebeat.com/technology/salesforce-rolls-out-new-slackbot-ai-agent-as-it-battles-microsoft-and",
+        "source_feed": "https://venturebeat.com/category/ai/feed/",
+        "score": 85,
+        "justification": "Major update to Slack's AI capabilities; Slack is a primary integration target for B2B automation workflows."
+    },
+    {
+        "title": "Anthropic launches Cowork, a Claude Desktop agent that works in your files \u2014 no coding required",
+        "link": "https://venturebeat.com/technology/anthropic-launches-cowork-a-claude-desktop-agent-that-works-in-your-files-no",
+        "source_feed": "https://venturebeat.com/category/ai/feed/",
+        "score": 94,
+        "justification": "High-priority technical release from Anthropic regarding desktop agents; directly aligns with the user's focus on LLMs and agentic workflows."
+    },
+    {
+        "title": "Home construction in Wisconsin grew during first quarter",
+        "link": "https://biztimes.com/home-construction-in-wisconsin-grew-during-first-quarter/",
+        "source_feed": "https://biztimes.com/feed/",
+        "score": 82,
+        "justification": "Local Milwaukee/Wisconsin economic data showing growth in construction, indicating potential B2B prospecting opportunities in the building sector."
+    },
+    {
+        "title": "Bucks officially name new head coach",
+        "link": "https://biztimes.com/bucks-officially-name-new-head-coach/",
+        "source_feed": "https://biztimes.com/feed/",
+        "score": 95,
+        "justification": "Directly aligns with Pillar 4; major coaching change for the Milwaukee Bucks, a primary team of interest."
+    },
+    {
+        "title": "WisDOT study says I-794 removal would create major development opportunity, but at significant cost and would bring increased traffic issues",
+        "link": "https://biztimes.com/wisdot-study-says-i-794-removal-would-creative-significant-development-opportunity-but-at-significant-cost-and-would-bring-increased-traffic-issues/",
+        "source_feed": "https://biztimes.com/feed/",
+        "score": 88,
+        "justification": "Significant Milwaukee municipal development news regarding I-794; high value for local competitive intelligence and long-term prospecting."
+    },
+    {
+        "title": "See photos from BizTimes\u2019 Bourbon & Brokers event",
+        "link": "https://biztimes.com/see-photos-from-biztimes-bourbon-brokers-event/",
+        "source_feed": "https://biztimes.com/feed/",
+        "score": 80,
+        "justification": "Local networking intelligence identifying key players in the Southeastern Wisconsin real estate industry, a prime target for automation services."
+    },
+    {
+        "title": "Ice cream manufacturer plans operations in Cudahy industrial building",
+        "link": "https://biztimes.com/ice-cream-manufacturer-plans-operations-in-cudahy-industrial-building/",
+        "source_feed": "https://biztimes.com/feed/",
+        "score": 85,
+        "justification": "Direct business expansion lead in Cudahy (Milwaukee area); new industrial operations often require workflow automation and systems integration."
+    }
+]

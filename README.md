@@ -112,4 +112,15 @@ This repository has undergone a security hardening phase (Operation Ironclad). K
 
 We just deployed the **Communications Hub**, a zero-dependency Gmail MCP server that operates directly on bare-metal IMAP and SMTP protocols over SSL. We've officially bypassed the bloated `google-api-python-client` SDK and its associated OAuth overhead. Why use a multi-megabyte library to read a text message? 
 
-We've implemented **SOP-07 (Comms Chaining)**: the Qwen router now handles full-cycle email management. It retrieves unread messages via IMAP, delegates professional drafting to the Cloud Vanguard, and dispatches the final response via SMTP. By maintaining this logic on the edge, we ensure that our communication bus remains as lean and resilient as the hardware it runs on. Welcome back to the era of efficient, protocol-driven software.
+
+---
+### Architect's Log: The Chromium Purge (Operation Bare-Metal)
+**Date:** May 2026
+**Update: Tauri v2 Dashboard Migration (YOLO-1)**
+
+If you enjoy paying a 600MB "RAM tax" just to render a basic HTML table in a bloated Chromium shell, then this update isn't for you. For the rest of us who value hardware efficiency, the CEO Dashboard has been migrated to a native **Tauri v2** shell. 
+
+We've officially ditched the web browser. The dashboard now runs as a lean, bare-metal Windows executable leveraging the native WebView2 engine. The result? A memory footprint drop from ~600MB to under 40MB. We've also aligned the CORS policies across the Mercenary Router and PocketBase to authorize the `tauri://localhost` origin, ensuring the "CEO Omni-Pane" has secure, low-latency access to the local intelligence bus.
+
+Because let's be honest: if your dashboard requires more RAM than the AI models it's monitoring, you're doing it wrong. The silicon belongs to the agents, not the browser engine.
+

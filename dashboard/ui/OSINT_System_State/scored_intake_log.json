@@ -1,0 +1,121 @@
+[
+    {
+        "title": "Introducing NVIDIA Nemotron 3 Nano Omni: Long-Context Multimodal Intelligence for Documents, Audio and Video Agents",
+        "link": "https://huggingface.co/blog/nvidia/nemotron-3-nano-omni-multimodal-intelligence",
+        "source_feed": "https://huggingface.co/blog/feed.xml",
+        "score": 92,
+        "justification": "High-value technical release from NVIDIA regarding multimodal agents and long-context intelligence, directly impacting the user's AI model and agent architecture stack."
+    },
+    {
+        "title": "How to build scalable web apps with OpenAI's Privacy Filter",
+        "link": "https://huggingface.co/blog/openai-privacy-filter-web-apps",
+        "source_feed": "https://huggingface.co/blog/feed.xml",
+        "score": 88,
+        "justification": "Directly addresses technical implementation of privacy filters for OpenAI, a critical requirement for B2B AI integration and data security."
+    },
+    {
+        "title": "Updated OSINT VM",
+        "link": "https://inteltechniques.com/blog/2026/04/04/updated-osint-vm/",
+        "source_feed": "https://inteltechniques.com/blog/feed/",
+        "score": 45,
+        "justification": "Technical update for OSINT virtual machines; while technical, it is tangential to the core AI integration and automation stack."
+    },
+    {
+        "title": "Upcoming OSINT Live Courses",
+        "link": "https://inteltechniques.com/blog/2026/03/24/upcoming-osint-live-courses/",
+        "source_feed": "https://inteltechniques.com/blog/feed/",
+        "score": 30,
+        "justification": "Public training courses for OSINT; low relevance to AI strategy or local Milwaukee business prospecting."
+    },
+    {
+        "title": "80Gpbs Drive Enclosures",
+        "link": "https://inteltechniques.com/blog/2026/03/12/80gpbs-drive-enclosures/",
+        "source_feed": "https://inteltechniques.com/blog/feed/",
+        "score": 35,
+        "justification": "Hardware-focused article on drive enclosures; lacks direct relevance to AI software integration or local business leads."
+    },
+    {
+        "title": "UNREDACTED Magazine 011",
+        "link": "https://inteltechniques.com/blog/2026/02/24/unredacted-magazine-011/",
+        "source_feed": "https://inteltechniques.com/blog/feed/",
+        "score": 40,
+        "justification": "General privacy and security magazine content; provides some technical context but lacks specific AI or local business utility."
+    },
+    {
+        "title": "Video Training Final Price Increase",
+        "link": "https://inteltechniques.com/blog/2026/02/17/video-training-final-price-increase/",
+        "source_feed": "https://inteltechniques.com/blog/feed/",
+        "score": 20,
+        "justification": "Marketing material for OSINT video training; redundant and irrelevant to the user's core business pillars."
+    },
+    {
+        "title": "Railway secures $100 million to challenge AWS with AI-native cloud infrastructure",
+        "link": "https://venturebeat.com/infrastructure/railway-secures-usd100-million-to-challenge-aws-with-ai-native-cloud",
+        "source_feed": "https://venturebeat.com/category/ai/feed/",
+        "score": 75,
+        "justification": "Strategic intelligence on AI-native cloud infrastructure funding; relevant for long-term technical stack decisions and market trends."
+    },
+    {
+        "title": "Claude Code costs up to $200 a month. Goose does the same thing for free.",
+        "link": "https://venturebeat.com/infrastructure/claude-code-costs-up-to-usd200-a-month-goose-does-the-same-thing-for-free",
+        "source_feed": "https://venturebeat.com/category/ai/feed/",
+        "score": 90,
+        "justification": "Critical technical tooling comparison between Claude Code and open-source alternatives, directly impacting developer workflow and cost management."
+    },
+    {
+        "title": "Listen Labs raises $69M after viral billboard hiring stunt to scale AI customer interviews",
+        "link": "https://venturebeat.com/technology/listen-labs-raises-usd69m-after-viral-billboard-hiring-stunt-to-scale-ai",
+        "source_feed": "https://venturebeat.com/category/ai/feed/",
+        "score": 65,
+        "justification": "Strategic education on AI-driven customer interview automation and market trends in AI hiring."
+    },
+    {
+        "title": "Salesforce rolls out new Slackbot AI agent as it battles Microsoft and Google in workplace AI",
+        "link": "https://venturebeat.com/technology/salesforce-rolls-out-new-slackbot-ai-agent-as-it-battles-microsoft-and",
+        "source_feed": "https://venturebeat.com/category/ai/feed/",
+        "score": 85,
+        "justification": "Major update to Slack's AI capabilities; Slack is a primary integration target for B2B automation workflows."
+    },
+    {
+        "title": "Anthropic launches Cowork, a Claude Desktop agent that works in your files \u2014 no coding required",
+        "link": "https://venturebeat.com/technology/anthropic-launches-cowork-a-claude-desktop-agent-that-works-in-your-files-no",
+        "source_feed": "https://venturebeat.com/category/ai/feed/",
+        "score": 94,
+        "justification": "High-priority technical release from Anthropic regarding desktop agents; directly aligns with the user's focus on LLMs and agentic workflows."
+    },
+    {
+        "title": "Home construction in Wisconsin grew during first quarter",
+        "link": "https://biztimes.com/home-construction-in-wisconsin-grew-during-first-quarter/",
+        "source_feed": "https://biztimes.com/feed/",
+        "score": 82,
+        "justification": "Local Milwaukee/Wisconsin economic data showing growth in construction, indicating potential B2B prospecting opportunities in the building sector."
+    },
+    {
+        "title": "Bucks officially name new head coach",
+        "link": "https://biztimes.com/bucks-officially-name-new-head-coach/",
+        "source_feed": "https://biztimes.com/feed/",
+        "score": 95,
+        "justification": "Directly aligns with Pillar 4; major coaching change for the Milwaukee Bucks, a primary team of interest."
+    },
+    {
+        "title": "WisDOT study says I-794 removal would create major development opportunity, but at significant cost and would bring increased traffic issues",
+        "link": "https://biztimes.com/wisdot-study-says-i-794-removal-would-creative-significant-development-opportunity-but-at-significant-cost-and-would-bring-increased-traffic-issues/",
+        "source_feed": "https://biztimes.com/feed/",
+        "score": 88,
+        "justification": "Significant Milwaukee municipal development news regarding I-794; high value for local competitive intelligence and long-term prospecting."
+    },
+    {
+        "title": "See photos from BizTimes\u2019 Bourbon & Brokers event",
+        "link": "https://biztimes.com/see-photos-from-biztimes-bourbon-brokers-event/",
+        "source_feed": "https://biztimes.com/feed/",
+        "score": 80,
+        "justification": "Local networking intelligence identifying key players in the Southeastern Wisconsin real estate industry, a prime target for automation services."
+    },
+    {
+        "title": "Ice cream manufacturer plans operations in Cudahy industrial building",
+        "link": "https://biztimes.com/ice-cream-manufacturer-plans-operations-in-cudahy-industrial-building/",
+        "source_feed": "https://biztimes.com/feed/",
+        "score": 85,
+        "justification": "Direct business expansion lead in Cudahy (Milwaukee area); new industrial operations often require workflow automation and systems integration."
+    }
+]
