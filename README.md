@@ -108,8 +108,8 @@ This repository has undergone a security hardening phase (Operation Ironclad). K
 ---
 ### Architect's Log: The Edge Node Evolves
 **Date:** May 2026
-**Update: OSINT Deep Research & Zero-Dependency Scaping**
+**Update: Bare-Metal Communications Hub & IMAP/SMTP Integration**
 
-We've officially severed our dependence on bloated third-party scraping libraries. The new **OSINT Research Node** is a bare-metal MCP server written using only the Python standard library. No BeautifulSoup, no Selenium, no overhead. Just raw `urllib` and a custom `HTMLParser` to strip the noise and extract the signal.
+We just deployed the **Communications Hub**, a zero-dependency Gmail MCP server that operates directly on bare-metal IMAP and SMTP protocols over SSL. We've officially bypassed the bloated `google-api-python-client` SDK and its associated OAuth overhead. Why use a multi-megabyte library to read a text message? 
 
-We've implemented **SOP-06 (OSINT Chaining)**: the local Qwen router now proactively triggers a web scrape when it detects a request for current events or internet-based data. This raw intel is then piped directly into the Cloud Vanguard's cognitive payload. By performing the heavy research on the edge and using the cloud only for final synthesis, we've achieved a research loop that is both cost-effective and hardware-resilient. This is how you build a professional intelligence node: ruthless efficiency, zero bloat, and absolute control over the DOM. 
+We've implemented **SOP-07 (Comms Chaining)**: the Qwen router now handles full-cycle email management. It retrieves unread messages via IMAP, delegates professional drafting to the Cloud Vanguard, and dispatches the final response via SMTP. By maintaining this logic on the edge, we ensure that our communication bus remains as lean and resilient as the hardware it runs on. Welcome back to the era of efficient, protocol-driven software.

@@ -47,6 +47,10 @@ async def initialize_nexus():
         "OSINT Node": StdioServerParameters(
             command=r"Z:\foundry_project\venv\Scripts\python.exe",
             args=[r"Z:\foundry_project\core\web_mcp.py"]
+        ),
+        "Communications Hub": StdioServerParameters(
+            command=r"Z:\foundry_project\venv\Scripts\python.exe",
+            args=[r"Z:\foundry_project\core\gmail_mcp.py"]
         )
     }
 

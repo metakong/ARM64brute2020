@@ -172,7 +172,7 @@ class DSIECore:
         # ==========================================
         routing_decision = "Local"
         first_10_words = " ".join(words[:10]).lower()
-        triggers = ["cloud", "gemini", "complex", "analyze", "code", "search", "database", "web", "internet", "osint", "news", "current"]
+        triggers = ["cloud", "gemini", "complex", "analyze", "code", "search", "database", "web", "internet", "osint", "news", "current", "email", "gmail", "inbox", "reply", "send", "message", "communications"]
         force_cloud = any(t in first_10_words for t in triggers)
         
         log_intent(clean_text, routing_decision if not force_cloud else "Cloud")
@@ -192,6 +192,11 @@ class DSIECore:
         SOP-06 (OSINT Chaining): If the user's prompt requests current data, news, or explicitly asks to "search the web", 
         you MUST first call osint_scrape to gather raw internet data. 
         Once the data is retrieved, you MUST package that raw data into the payload for delegate_to_gemini and dispatch it to the background queue.
+
+        SOP-07 (Comms Chaining): If the user asks to check email or read the inbox, you MUST use fetch_unread_emails, 
+        then package the retrieved text into delegate_to_gemini for summarization. 
+        If the user asks to reply or send an email, you MUST package the request into delegate_to_gemini to draft the professional response, 
+        and then use send_email to dispatch the resulting draft.
         
         If the user request is complex or matches your trigger list, use the delegate_to_gemini tool.
         """
