@@ -20,7 +20,7 @@ from google.genai import types
 # MCP Nexus Integration
 import asyncio
 import gc
-from mcp_nexus import initialize_nexus, call_mcp_tool, get_tools_for_llm, shutdown_nexus
+from mcp_nexus import initialize_nexus, call_mcp_tool_sync, get_tools_for_llm, shutdown_nexus_sync
 from tools.intent_logger import log_intent
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -209,9 +209,11 @@ class DSIECore:
 
         available_mcp_tools = get_tools_for_llm()
         tools = [{"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.inputSchema}} for t in available_mcp_tools]
-        tool_choice = {"type": "function", "function": {"name": "delegate_to_gemini"}} if force_cloud else "auto"
 
-        response = self.chat_client.complete_chat(messages, tools=tools, tool_choice=tool_choice)
+        # NOTE: tool_choice is NOT supported by the Foundry Local SDK's ChatClient.
+        # Tool routing is enforced via the system prompt (capability_schema) and
+        # the force_cloud trigger list above.
+        response = self.chat_client.complete_chat(messages, tools=tools)
         
         prefix = "[SOP-Active]"
         if response.choices[0].message.tool_calls:
@@ -229,7 +231,7 @@ class DSIECore:
                 tool_name = tool_call.function.name
                 tool_args = json.loads(tool_call.function.arguments)
                 print(f"  [MCP EXECUTE] Calling: {tool_name}")
-                tool_result = asyncio.run(call_mcp_tool(tool_name, tool_args))
+                tool_result = call_mcp_tool_sync(tool_name, tool_args)
 
                 if tool_name == "delegate_to_gemini": prefix = "[Vanguard-Result]"
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": str(tool_result)})
@@ -271,8 +273,7 @@ class DSIECore:
         if hasattr(self, 'audio_client'): del self.audio_client
         if self.llm_model: self.llm_model.unload()
         if self.whisper_model: self.whisper_model.unload()
-        try: asyncio.run(shutdown_nexus())
-        except Exception: pass
+        shutdown_nexus_sync()
 
 if __name__ == "__main__":
     core = DSIECore()
