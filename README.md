@@ -108,10 +108,8 @@ This repository has undergone a security hardening phase (Operation Ironclad). K
 ---
 ### Architect's Log: The Edge Node Evolves
 **Date:** May 2026
-**Update: Vanguard-Router Convergence & The Vocal Leash**
+**Update: Omni-Pane Bridge & JIT Context Hydration**
 
-We just successfully implemented a decoupled Cloud Delegation architecture. The local Qwen 4B model has been neutered into a pure "Status Router." It no longer attempts to hallucinate its way through complex logic it wasn't built for. 
+We just bypassed the complexity of pure websocket overhead by implementing a native SSE-backed command bridge. The dashboard now features an "Omni-Pane" input area that hits a specialized FastAPI REST endpoint on the Mercenary Router. This endpoint bridges directly to the `dsie_core` NPU inference engine, allowing for direct CEO-to-Bus text injection.
 
-Instead, we deployed a standalone Gemini 3 Flash "Vanguard" MCP server. The local router now scans every interaction for triggers (Cloud, Gemini, Complex, etc.). If detected, it immediately hands off the task to the cloud-tier intelligence via our cognitive bus. 
-
-We also enforced the "Vocal Heartbeat" protocol. The assistant now explicitly states what it's doing ([SOP-Active] -> Routing to Cloud Vanguard) before delegating, providing full transparency in the tool-call interception loop. Intent logging is now live, capturing every routing decision for future model fine-tuning. This is how you run a professional edge node: ruthless intent analysis, zero wasted tokens, and absolute hardware control.
+Furthermore, we've implemented **Just-In-Time (JIT) Context Hydration**. Unlike naive RAG systems that bloat your vector DB with useless noise, our router now detects when business logic or SOPs are required. It dynamically triggers the GDrive MCP to fetch targeted documentation, hydrates the prompt with fresh context, and delegates the heavy lifting to the Cloud Vanguard. We are effectively running a "cognitive cache" that only loads what is necessary for the current task. Memory efficiency isn't just about RAM; it's about context relevance. 

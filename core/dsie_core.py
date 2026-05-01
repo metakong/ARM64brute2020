@@ -63,13 +63,11 @@ class DSIECore:
         log_path = r"Z:\foundry_project\logs"
         os.makedirs(log_path, exist_ok=True)
         
-        # Load API keys natively to bypass external router dependence for the voice engine
         load_dotenv(str(BASE_DIR / 'secrets' / '.env'))
         self.google_api_key = os.getenv('GOOGLE_API_KEY')
         if self.google_api_key:
             self.gemini_client = genai.Client(api_key=self.google_api_key)
         else:
-            print("[WARNING] GOOGLE_API_KEY not found in .env. Cloud handoff disabled.")
             self.gemini_client = None
         
         config = Configuration(
@@ -90,29 +88,20 @@ class DSIECore:
         self.llm_model = None
         self.whisper_model = None
         
-        # Initialize MCP Nexus Connections
         asyncio.run(initialize_nexus())
 
     def load_hardware(self):
-        print("[SYSTEM] Syncing Models with Native SDK Registry...")
         try:
-            print(" -> Syncing Qwen to Hexagon NPU...")
             self.llm_model = self.manager.catalog.get_model("qwen2.5-0.5b")
-            
-            if self.llm_model is None:
-                raise Exception("Model not found in catalog. Check network connection.")
-                
             self.llm_model.load()
             self.chat_client = self.llm_model.get_chat_client()
 
-            print(" -> Syncing Whisper to Hexagon NPU...")
             self.whisper_model = self.manager.catalog.get_model("whisper-tiny")
             if not self.whisper_model.is_cached:
                 self.whisper_model.download()
             self.whisper_model.load()
             self.audio_client = self.whisper_model.get_audio_client()
             self.audio_client.settings.language = 'en'
-            
             print("[SUCCESS] Hardware Locked.")
         except Exception as e:
             print(f"[!] Critical Load Error: {e}")
@@ -122,19 +111,15 @@ class DSIECore:
         clean_text = re.sub(r"[^a-zA-Z0-9\s\.\?\!,'\-]", '', text).strip()
         if not clean_text or len(clean_text) < 2: return
         print(f"\n[CODEX]: {clean_text}")
-        
         ps_cmd = "Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Speak($env:CODEX_SPEECH_TEXT)"
-        
         custom_env = os.environ.copy()
         custom_env["CODEX_SPEECH_TEXT"] = clean_text
-        
         subprocess.run([POWERSHELL_EXE, "-Command", ps_cmd], env=custom_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def listen(self, filename=TEMP_WAV_PATH, samplerate=16000, threshold=0.03, silence_delay=2.0):
         chunk_samples = int(samplerate * 0.1)
         max_silence_chunks = int(silence_delay / 0.1)
         audio_buffer, is_recording, silence_counter = [], False, 0
-        
         with sd.InputStream(device=self.mic_index, samplerate=samplerate, channels=1, dtype='float32') as stream:
             while True:
                 chunk, _ = stream.read(chunk_samples)
@@ -147,11 +132,9 @@ class DSIECore:
                     audio_buffer.append(chunk)
                     silence_counter += 1
                     if silence_counter >= max_silence_chunks: break 
-                        
         if not audio_buffer: return False
         recording = np.concatenate(audio_buffer, axis=0)
         if len(recording) < samplerate: return False
-            
         with wave.open(filename, 'wb') as wf:
             wf.setnchannels(1)
             wf.setsampwidth(2)
@@ -167,14 +150,94 @@ class DSIECore:
         try: requests.post("http://127.0.0.1:8090/api/collections/vault/records", json={"content": content, "type": record_type}, timeout=0.1)
         except Exception: pass
 
+    def process_text(self, clean_text):
+        """Processes text through the NPU inference engine."""
+        lower_text = clean_text.lower()
+        words = clean_text.split()
+        current_date = datetime.datetime.now().strftime('%A, %B %d, %Y')
+
+        if lower_text in ["codex shutdown", "codex sleep"]:
+            self.speak("Shutting down. Goodbye, CEO.")
+            self.shutdown()
+            sys.exit(0)
+
+        if "codex note" in lower_text or "codex remember" in lower_text:
+            content = re.sub(r'codex (note|remember)\s*(that)?', '', lower_text).strip()
+            self.push_to_vault(content)
+            self.speak("Memory secured.")
+            return "Memory secured."
+
+        # ==========================================
+        # VANGUARD ROUTER LOGIC
+        # ==========================================
+        routing_decision = "Local"
+        first_10_words = " ".join(words[:10]).lower()
+        triggers = ["cloud", "gemini", "complex", "analyze", "code", "search", "database"]
+        force_cloud = any(t in first_10_words for t in triggers)
+        
+        log_intent(clean_text, routing_decision if not force_cloud else "Cloud")
+
+        capability_schema = f"""
+        DOMAIN: Edge Routing / Status Notification.
+        CONSTRAINTS: 4B Parameter limit. No local file access.
+        GOAL: Analyze intent. Today is {current_date}. 
+        
+        SOP-04 (Context Hydration): If the user's prompt implies "working theory", "SOP", "rules", or "business logic", 
+        you MUST execute fetch_business_sop to retrieve the local context. 
+        Once retrieved, you MUST include that context in your payload when triggering delegate_to_gemini.
+        
+        If the user request is complex or matches your trigger list, use the delegate_to_gemini tool.
+        """
+        
+        messages = [
+            {"role": "system", "content": capability_schema},
+            {"role": "user", "content": clean_text}
+        ]
+
+        available_mcp_tools = get_tools_for_llm()
+        tools = [{"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.inputSchema}} for t in available_mcp_tools]
+        tool_choice = {"type": "function", "function": {"name": "delegate_to_gemini"}} if force_cloud else "auto"
+
+        response = self.chat_client.complete_chat(messages, tools=tools, tool_choice=tool_choice)
+        
+        prefix = "[SOP-Active]"
+        if response.choices[0].message.tool_calls:
+            tool_names = [tc.function.name for tc in response.choices[0].message.tool_calls]
+            self.speak(f"[SOP-Active] -> Routing to {', '.join(tool_names)}")
+
+            assistant_msg = {
+                "role": "assistant",
+                "content": response.choices[0].message.content,
+                "tool_calls": [{"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}} for tc in response.choices[0].message.tool_calls]
+            }
+            messages.append(assistant_msg)
+
+            for tool_call in response.choices[0].message.tool_calls:
+                tool_name = tool_call.function.name
+                tool_args = json.loads(tool_call.function.arguments)
+                print(f"  [MCP EXECUTE] Calling: {tool_name}")
+                tool_result = asyncio.run(call_mcp_tool(tool_name, tool_args))
+
+                if tool_name == "delegate_to_gemini": prefix = "[Vanguard-Result]"
+                messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": str(tool_result)})
+                gc.collect()
+
+            response = self.chat_client.complete_chat(messages)
+        else:
+            prefix = "[Local-FreeStyle]"
+
+        reply = f"{prefix} {response.choices[0].message.content.strip()}"
+        self.push_transcript("CEO", clean_text)
+        self.push_transcript("Codex", reply)
+        self.speak(reply)
+        return reply
+
     def run(self):
         self.load_hardware()
-        print("\n[SYSTEM] Calibrating audio floor. Please remain silent...")
-        
-        recording = sd.rec(int(2.0 * 16000), samplerate=16000, channels=1, dtype='float32', device=self.mic_index)
+        print("\n[SYSTEM] Calibrating audio floor...")
+        recording = sd.rec(int(1.5 * 16000), samplerate=16000, channels=1, dtype='float32', device=self.mic_index)
         sd.wait()
         vad_threshold = max(np.sqrt(np.mean(recording**2)) * 3.0, 0.05)
-
         self.speak("System online. Algorithmic Routing active.")
         hallucinations = ["thank you", "watching", "subscribe", "cannot process", "audio file", "i'm sorry", "am sorry", "hear that", "subtitle"]
         
@@ -183,183 +246,20 @@ class DSIECore:
                 try:
                     result = self.audio_client.transcribe(TEMP_WAV_PATH)
                     clean_text = result.text.strip()
-                    lower_text = clean_text.lower()
-                    
                     if len(clean_text) < 2: continue
-                    if any(h in lower_text for h in hallucinations) and len(clean_text) < 60:
-                        continue
-
+                    if any(h in clean_text.lower() for h in hallucinations) and len(clean_text) < 60: continue
                     print(f"\n[YOU]: {clean_text}")
-                    
-                    # Intercept simple operational commands locally to save tokens
-                    if lower_text in ["codex shutdown", "codex sleep"]:
-                        self.speak("Shutting down. Goodbye, CEO.")
-                        self.shutdown()
-                        sys.exit(0)
-
-                    if "codex note" in lower_text or "codex remember" in lower_text:
-                        content = re.sub(r'codex (note|remember)\s*(that)?', '', lower_text).strip()
-                        self.push_to_vault(content)
-                        self.speak("Memory secured.")
-                        continue
-
-                    # ==========================================
-                    # ALGORITHMIC WORKLOAD ROUTER (Math-Based Heuristics)
-                    # ==========================================
-                    words = clean_text.split()
-                    word_count = len(words)
-                    digit_count = sum(c.isdigit() for c in clean_text)
-                    
-                    # Word boundaries prevent false positive matches. Added "search" and "look up"
-                    logic_terms = [r"\bif\b", r"\bthen\b", r"\bexcept\b", r"\bassuming\b", r"\bbecause\b", r"\btherefore\b", r"\bcalculate\b", r"\bsolve\b", r"\bdetermine\b", r"\bwhy\b", r"how many", r"\bsearch\b", r"\blook up\b"]
-                    logic_count = sum(len(re.findall(term, lower_text)) for term in logic_terms)
-                    
-                    # The INT4 Mathematical Limits
-                    is_too_long = word_count >= 25
-                    is_too_factual = digit_count >= 3
-                    is_too_logical = logic_count >= 2
-                    is_complex_question = "?" in clean_text and word_count > 6
-                    is_manual_override = "codex query" in lower_text or "codex, query" in lower_text
-                    
-                    requires_cloud = is_too_long or is_too_factual or is_too_logical or is_complex_question or is_manual_override
-
-                    # UX Output so you can see exactly why the math routed it
-                    print(f"  [ROUTER MATH] Words: {word_count}/25 | Digits: {digit_count}/3 | Logic: {logic_count}/2 | Complex ?: {is_complex_question}")
-                    print(f"  [DESTINATION] {'☁️ GEMINI 3 FLASH (with Search)' if requires_cloud else '🖥️ LOCAL QWEN 4B'}")
-
-                    # ==========================================
-                    # EXECUTION LAYER
-                    # ==========================================
-                    current_date = datetime.datetime.now().strftime('%A, %B %d, %Y')
-                    
-                    if requires_cloud:
-                        if not self.gemini_client:
-                            self.speak("Cloud keys are missing. I cannot route this task.")
-                            continue
-
-                        try:
-                            # Search Grounding correctly enabled via official SDK types
-                            cloud_response = self.gemini_client.models.generate_content(
-                                model='gemini-3-flash-preview',
-                                contents=clean_text,
-                                config=types.GenerateContentConfig(
-                                    system_instruction=f"You are the DSIE Codex Cloud Engine. Today is {current_date}. Provide direct, highly accurate, and conversational answers. Keep formatting simple as your response will be read aloud.",
-                                    temperature=0.2,
-                                    tools=[types.Tool(google_search=types.GoogleSearch())]
-                                )
-                            )
-                            cloud_reply = cloud_response.text.strip()
-                            
-                            self.push_transcript("CEO", clean_text)
-                            self.push_transcript("Codex (Gemini)", cloud_reply)
-                            self.speak(cloud_reply)
-                            
-                        except Exception as e:
-                            print(f"[!] Gemini API Failed: {e}")
-                            self.speak("Cloud connection failed. I cannot retrieve that data right now.")
-                            
-                    else:
-                        # ==========================================
-                        # VANGUARD ROUTER LOGIC
-                        # ==========================================
-                        routing_decision = "Local"
-                        first_10_words = " ".join(words[:10]).lower()
-                        triggers = ["cloud", "gemini", "complex", "analyze", "code", "search", "database"]
-                        
-                        force_cloud = any(t in first_10_words for t in triggers)
-                        if force_cloud:
-                            routing_decision = "Cloud"
-                            print(f"  [ROUTER] Trigger detected in first 10 words. Forcing Cloud Vanguard.")
-
-                        log_intent(clean_text, routing_decision)
-
-                        capability_schema = f"""
-                        DOMAIN: Edge Routing / Status Notification.
-                        CONSTRAINTS: 4B Parameter limit. No local file access.
-                        GOAL: Analyze intent. Today is {current_date}. 
-                        If the user request is complex or matches your trigger list, use the delegate_to_gemini tool.
-                        """
-                        
-                        messages = [
-                            {"role": "system", "content": capability_schema},
-                            {"role": "user", "content": clean_text}
-                        ]
-
-                        # Map MCP Tools
-                        available_mcp_tools = get_tools_for_llm()
-                        tools = [{"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.inputSchema}} for t in available_mcp_tools]
-
-                        # Force delegate_to_gemini if cloud trigger was hit
-                        tool_choice = {"type": "function", "function": {"name": "delegate_to_gemini"}} if force_cloud else "auto"
-
-                        # Phase 1: Initial Inference
-                        response = self.chat_client.complete_chat(messages, tools=tools, tool_choice=tool_choice)
-                        
-                        # Phase 2: Tool Execution & Vocal Heartbeat
-                        prefix = "[SOP-Active]"
-                        if response.choices[0].message.tool_calls:
-                            # Vocal Heartbeat
-                            tool_names = [tc.function.name for tc in response.choices[0].message.tool_calls]
-                            desc = f"Routing to {', '.join(tool_names)}"
-                            self.speak(f"[SOP-Active] -> {desc}")
-
-                            assistant_msg = {
-                                "role": "assistant",
-                                "content": response.choices[0].message.content,
-                                "tool_calls": [
-                                    {
-                                        "id": tc.id,
-                                        "type": "function",
-                                        "function": {
-                                            "name": tc.function.name,
-                                            "arguments": tc.function.arguments
-                                        }
-                                    } for tc in response.choices[0].message.tool_calls
-                                ]
-                            }
-                            messages.append(assistant_msg)
-
-                            for tool_call in response.choices[0].message.tool_calls:
-                                tool_name = tool_call.function.name
-                                tool_args = json.loads(tool_call.function.arguments)
-                                
-                                print(f"  [MCP EXECUTE] Calling: {tool_name}({tool_call.function.arguments})")
-                                tool_result = asyncio.run(call_mcp_tool(tool_name, tool_args))
-
-                                if tool_name == "delegate_to_gemini":
-                                    prefix = "[Vanguard-Result]"
-
-                                messages.append({
-                                    "role": "tool",
-                                    "tool_call_id": tool_call.id,
-                                    "content": str(tool_result)
-                                })
-                                gc.collect()
-
-                            # Phase 3: Final Synthesis
-                            response = self.chat_client.complete_chat(messages)
-                        else:
-                            prefix = "[Local-FreeStyle]"
-
-                        reply = f"{prefix} {response.choices[0].message.content.strip()}"
-                        
-                        self.push_transcript("CEO", clean_text)
-                        self.push_transcript("Codex", reply)
-                        self.speak(reply)
-
-                except Exception as e:
-                    print(f"[!] Runtime Error: {e}")
+                    self.process_text(clean_text)
+                except Exception as e: print(f"[!] Runtime Error: {e}")
 
     def shutdown(self):
-        print("\n[SYSTEM] Releasing NPU & MCP Nexus...")
+        print("\n[SYSTEM] Releasing Hardware...")
         if hasattr(self, 'chat_client'): del self.chat_client
         if hasattr(self, 'audio_client'): del self.audio_client
         if self.llm_model: self.llm_model.unload()
         if self.whisper_model: self.whisper_model.unload()
-        try:
-            asyncio.run(shutdown_nexus())
-        except Exception:
-            pass
+        try: asyncio.run(shutdown_nexus())
+        except Exception: pass
 
 if __name__ == "__main__":
     core = DSIECore()

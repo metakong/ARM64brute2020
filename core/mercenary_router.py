@@ -22,6 +22,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Bridge to DSIE Core
+from dsie_core import DSIECore
+_dsie = None
+
+def get_dsie():
+    global _dsie
+    if _dsie is None:
+        _dsie = DSIECore()
+        _dsie.load_hardware()
+    return _dsie
+
+class PromptRequest(BaseModel):
+    prompt: str
+
 class ChatRequest(BaseModel):
     provider: str
     model: str
@@ -144,6 +158,17 @@ def route_chat(req: ChatRequest):
     }
 
     return execute_request_with_backoff(provider_config["url"], headers, payload)
+
+@app.post("/api/chat")
+def omni_chat(req: PromptRequest):
+    """Bridges the UI input area to the local DSIE Core inference engine."""
+    try:
+        core = get_dsie()
+        # process_text handles PocketBase pushes and TTS natively
+        reply = core.process_text(req.prompt)
+        return {"status": "success", "reply": reply}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

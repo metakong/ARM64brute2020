@@ -52,5 +52,30 @@ def search_drive(query: str) -> str:
     except Exception as e:
         return f"Error executing search: {e}"
 
+@mcp.tool()
+def fetch_business_sop(topic: str) -> str:
+    """Retrieves business rules, SOPs, or templates from Google Drive based on a topic."""
+    # Targeted query for SOP/Template and the topic
+    safe_topic = topic.replace("'", "\\'")
+    query = f"(name contains 'SOP' or name contains 'Template') and name contains '{safe_topic}' and trashed = false"
+    
+    try:
+        results = drive_service.files().list(q=query, spaces='drive', fields="files(id, name)").execute()
+        files = results.get('files', [])
+        
+        if not files:
+            return f"No SOP or Template found for topic: {topic}"
+            
+        # Get content of the first match (assuming most relevant)
+        file_id = files[0]['id']
+        file_name = files[0]['name']
+        
+        # Download file content
+        content = drive_service.files().get_media(fileId=file_id).execute().decode('utf-8')
+        return f"--- DOCUMENT: {file_name} ---\n{content}"
+        
+    except Exception as e:
+        return f"Error fetching SOP: {e}"
+
 if __name__ == "__main__":
     mcp.run()
