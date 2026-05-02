@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark bg-transparent">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,43 +7,74 @@
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script src="https://unpkg.com/pocketbase/dist/pocketbase.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <style>
-        :root {
-            color-scheme: light dark;
-            --theme-bus: light-dark(#059669, #10b981);
-            --theme-merc: light-dark(#7c3aed, #8b5cf6);
-            --bg-glass: rgba(17, 24, 39, 0.7);
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: {
+                            950: '#030712'
+                        }
+                    }
+                }
+            }
         }
-        
-        /* Macro-Shell Architecture */
+    </script>
+    <style>
+        /* ════════════════════════════════════════════════
+           PHASE 1: MACRO-STRUCTURAL SCAFFOLDING
+           ════════════════════════════════════════════════ */
         html, body {
-            overflow: hidden;
             height: 100vh;
+            width: 100vw;
             margin: 0;
             padding: 0;
-            background: transparent; /* Mica vibrancy root */
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            overflow: hidden;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #030712; /* Gray-950 */
         }
 
-        body {
+        /* The Rigid Shell */
+        #app-root {
             display: grid;
-            grid-template-rows: 60px 1fr;
+            grid-template-rows: 64px 1fr;
+            height: 100%;
+            width: 100%;
         }
 
-        .min-0 {
-            min-width: 0;
+        /* Flexbox Blowout Protection */
+        .min-h-0 {
             min-height: 0;
         }
 
-        .pane-hidden {
-            content-visibility: hidden;
+        /* ════════════════════════════════════════════════
+           PHASE 2: VIEW STATE ENGINE (content-visibility)
+           ════════════════════════════════════════════════ */
+        .pane-hidden { content-visibility: hidden; }
+        .pane-visible { content-visibility: visible; }
+
+        /* All panes stack in grid row 2 */
+        .tab-pane {
+            grid-row: 2;
+            grid-column: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
         }
 
-        .pane-visible {
-            content-visibility: visible;
+        /* ════════════════════════════════════════════════
+           PHASE 4: TYPOGRAPHY & READABILITY
+           ════════════════════════════════════════════════ */
+        .streaming-text {
+            font-weight: 300;
+            line-height: 1.65;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
         }
 
-        /* Typography & Scrollbars */
+        .prose { line-height: 1.65 !important; }
+
+        /* Scrollbars */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
@@ -51,154 +82,141 @@
         
         @keyframes fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fade-in 0.3s ease-out; }
-        
-        .tab-active { border-bottom: 2px solid var(--theme-bus); color: var(--theme-bus); }
-        .tab-inactive { border-bottom: 2px solid transparent; color: #9ca3af; }
-        .tab-inactive:hover { color: #d1d5db; }
-
-        .prose { line-height: 1.65 !important; }
-        .font-streaming { font-weight: 300; }
-        .text-reading { color: #E5E7EB; }
-
-        /* All panes stack in grid row 2 */
-        main {
-            grid-row: 2;
-            grid-column: 1;
-        }
     </style>
 </head>
-<body class="text-gray-100">
+<body class="text-gray-100 antialiased selection:bg-emerald-500/30">
 
-    <!-- ═══════════════════════════ HEADER ═══════════════════════════ -->
-    <header class="border-b border-gray-700 shadow-lg flex flex-col justify-center min-0" 
-            style="background: var(--bg-glass); padding-right: var(--tauri-frame-controls-width, 0px); grid-row: 1;">
-        <div class="flex items-center justify-between px-6">
-            <div class="flex items-center space-x-6">
+    <div id="app-root">
+        <!-- ═══════════════════════════ HEADER ═══════════════════════════ -->
+        <header class="bg-gray-900 border-b border-gray-800 shadow-lg flex items-center justify-between px-6" style="grid-row: 1;">
+            <div class="flex items-center space-x-6 h-full">
                 <div class="flex items-center space-x-3">
-                    <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse" id="global-pulse"></div>
-                    <h1 class="text-xl font-bold tracking-widest text-white">DSIE CODEX <span class="text-gray-400 text-sm">| DASHBOARD</span></h1>
+                    <div class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse" id="global-pulse"></div>
+                    <h1 class="text-xl font-bold tracking-widest text-white">DSIE CODEX <span class="text-gray-500 text-sm">| DASHBOARD</span></h1>
                 </div>
-                <!-- TAB BAR (Integrated into Header Row) -->
-                <div class="flex space-x-6 text-sm font-semibold tracking-wider pt-2">
-                    <button id="btn-bus" onclick="switchTab('bus')" class="pb-2 tab-active transition-colors uppercase">Cognitive Bus</button>
-                    <button id="btn-news" onclick="switchTab('news')" class="pb-2 tab-inactive transition-colors uppercase">News Summary</button>
-                    <button id="btn-merc" onclick="switchTab('merc')" class="pb-2 tab-inactive transition-colors uppercase">Mercenary Terminal</button>
+                
+                <!-- 3-Tab Navigation Menu -->
+                <div class="flex space-x-6 text-sm font-semibold tracking-wider h-full pt-5">
+                    <button id="btn-bus" onclick="switchTab('bus')" class="border-b-2 border-emerald-500 text-emerald-500 pb-2 transition-colors uppercase">Cognitive Bus</button>
+                    <button id="btn-news" onclick="switchTab('news')" class="border-b-2 border-transparent text-gray-400 hover:text-gray-200 pb-2 transition-colors uppercase">News Summary</button>
+                    <button id="btn-merc" onclick="switchTab('merc')" class="border-b-2 border-transparent text-gray-400 hover:text-gray-200 pb-2 transition-colors uppercase">Mercenary Terminal</button>
                 </div>
             </div>
+            
             <div class="text-sm text-gray-400 flex flex-col items-end">
-                <div id="connection-status">Connecting to Bus...</div>
-                <div id="sse-status" class="text-[10px] text-gray-500 uppercase">SSE: Connecting...</div>
+                <div id="connection-status" class="text-emerald-500 font-medium">Connecting...</div>
+                <div id="sse-status" class="text-[10px] text-gray-500 uppercase tracking-widest">SSE: Awaiting</div>
             </div>
-        </div>
-    </header>
+        </header>
 
-    <!-- ═══════════════════════════ TAB 1: COGNITIVE BUS ═══════════════════════════ -->
-    <main id="tab-bus" class="flex flex-col min-0 pane-visible" style="background: rgba(17, 24, 39, 0.4);">
-        <div class="flex-1 overflow-y-auto p-6 space-y-4 min-0" id="bus-messages"></div>
-        <div class="flex-shrink-0 border-t border-gray-700 p-4 flex items-center space-x-3" style="background: var(--bg-glass);">
-            <input id="bus-input" type="text" placeholder="Send a command to Codex..."
-                   class="flex-1 bg-gray-900/80 border border-gray-600 rounded px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-colors"
-                   onkeydown="if(event.key==='Enter')sendCommand()">
-            <button onclick="sendCommand()" class="hover:bg-green-500 text-white px-6 py-2 rounded text-xs font-bold uppercase transition-all" style="background-color: var(--theme-bus);">Send</button>
-        </div>
-    </main>
+        <!-- ═══════════════════════════ TAB 1: COGNITIVE BUS ═══════════════════════════ -->
+        <main id="tab-bus" class="tab-pane pane-visible min-h-0 bg-gray-950">
+            <div class="flex-1 overflow-y-auto p-6 space-y-6 min-h-0" id="bus-messages">
+                <!-- Chat History renders here -->
+            </div>
+            
+            <!-- Fixed Input Bar -->
+            <div class="flex-shrink-0 border-t border-gray-800 bg-gray-900 p-4 flex items-center space-x-3">
+                <input id="bus-input" type="text" placeholder="Send a command to Codex..."
+                       class="flex-1 bg-gray-950 border border-gray-700 rounded-md px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono"
+                       onkeydown="if(event.key==='Enter')sendCommand()">
+                <button onclick="sendCommand()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-md text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-emerald-900/20">Send</button>
+            </div>
+        </main>
 
-    <!-- ═══════════════════════════ TAB 2: NEWS SUMMARY ═══════════════════════════ -->
-    <main id="tab-news" class="flex flex-col min-0 pane-hidden" style="background: rgba(17, 24, 39, 0.4);">
-        <!-- State A: Headline List -->
-        <div id="news-list-view" class="flex-1 overflow-y-auto p-6 space-y-3 min-0">
-            <div class="text-gray-500 text-sm uppercase tracking-widest mb-4">Latest Intelligence Briefs</div>
-            <div id="news-headlines" class="space-y-3"></div>
-            <div id="news-empty" class="text-gray-600 text-sm italic">Loading briefs from PocketBase...</div>
-        </div>
-        <!-- State B: Article Reader -->
-        <div id="news-reader-view" class="flex-1 flex flex-col min-0 pane-hidden">
-            <div class="flex-shrink-0 border-b border-gray-700 px-6 py-3 flex items-center space-x-4" style="background: var(--bg-glass);">
-                <button onclick="closeReader()" class="bg-gray-700/80 hover:bg-gray-600 text-white px-4 py-1.5 rounded text-xs font-bold uppercase transition-all">← Back to Headlines</button>
-                <span id="reader-title" class="text-sm text-gray-400 truncate"></span>
+        <!-- ═══════════════════════════ TAB 2: NEWS SUMMARY ═══════════════════════════ -->
+        <main id="tab-news" class="tab-pane pane-hidden min-h-0 bg-gray-950">
+            <!-- State A: List View -->
+            <div id="news-list-view" class="flex-1 overflow-y-auto p-6 space-y-4 min-h-0 pane-visible">
+                <div class="text-emerald-500 text-xs font-bold uppercase tracking-widest mb-6">Latest Intelligence Briefs</div>
+                <div id="news-headlines" class="space-y-4"></div>
+                <div id="news-empty" class="text-gray-600 text-sm italic">Loading briefs from PocketBase...</div>
             </div>
-            <div id="reader-content" class="flex-1 overflow-y-auto p-8 prose prose-invert prose-sm max-w-none text-reading min-0"></div>
-        </div>
-    </main>
+            
+            <!-- State B: Reading Pane -->
+            <div id="news-reader-view" class="flex-1 flex flex-col min-h-0 pane-hidden bg-gray-900">
+                <div class="flex-shrink-0 border-b border-gray-800 px-6 py-4 flex items-center space-x-4 bg-gray-900 shadow-sm z-10">
+                    <button onclick="closeReader()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-all border border-gray-700">← Back</button>
+                    <span id="reader-title" class="text-sm font-medium text-emerald-400 truncate"></span>
+                </div>
+                <div id="reader-content" class="flex-1 overflow-y-auto p-8 prose prose-invert prose-emerald max-w-4xl mx-auto streaming-text min-h-0 text-gray-300"></div>
+            </div>
+        </main>
 
-    <!-- ═══════════════════════════ TAB 3: MERCENARY TERMINAL ═══════════════════════════ -->
-    <main id="tab-merc" class="flex flex-col min-0 pane-hidden" style="background: rgba(17, 24, 39, 0.4);">
-        <div class="flex-1 flex flex-col p-6 space-y-4 min-0">
-            <!-- Provider Select -->
-            <div class="flex items-center space-x-4 flex-shrink-0">
-                <label class="text-xs text-gray-400 uppercase tracking-wider font-bold">Provider:</label>
-                <select id="merc-provider"
-                        class="flex-1 bg-gray-800/80 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none transition-colors"
-                        style="--tw-ring-color: var(--theme-merc);">
-                    <option value="">Loading providers...</option>
-                </select>
-                <label class="text-xs text-gray-400 uppercase tracking-wider font-bold">Model:</label>
-                <input id="merc-model" type="text" placeholder="auto"
-                       class="w-64 bg-gray-800/80 border border-gray-600 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none transition-colors"
-                       style="--tw-ring-color: var(--theme-merc);">
+        <!-- ═══════════════════════════ TAB 3: MERCENARY TERMINAL ═══════════════════════════ -->
+        <main id="tab-merc" class="tab-pane pane-hidden min-h-0 bg-gray-950">
+            <div class="flex-1 flex flex-col p-6 space-y-6 min-h-0">
+                <!-- Top Mounted Dropdown -->
+                <div class="flex items-center space-x-4 flex-shrink-0 bg-gray-900 p-4 rounded-lg border border-gray-800">
+                    <label class="text-xs text-gray-500 uppercase tracking-widest font-bold">Cloud Edge:</label>
+                    <select id="merc-provider"
+                            class="flex-1 bg-gray-950 border border-gray-700 rounded px-4 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer">
+                        <option value="">Scanning nexus nodes...</option>
+                    </select>
+                    <label class="text-xs text-gray-500 uppercase tracking-widest font-bold ml-4">Payload:</label>
+                    <input id="merc-model" type="text" placeholder="auto"
+                           class="w-64 bg-gray-950 border border-gray-700 rounded px-4 py-2 text-sm text-gray-400 focus:outline-none focus:border-blue-500 transition-colors font-mono">
+                </div>
+                
+                <!-- Chat Output -->
+                <div id="merc-output" class="flex-1 overflow-y-auto bg-gray-900 border border-gray-800 rounded-lg p-6 space-y-4 min-h-0 shadow-inner">
+                    <div class="text-blue-500/50 italic text-xs uppercase tracking-widest">Mercenary Terminal Online. Awaiting directive.</div>
+                </div>
+                
+                <!-- Large Mono-Spaced Textarea -->
+                <div class="flex-shrink-0 flex items-start space-x-4">
+                    <textarea id="merc-input" rows="4" placeholder="Enter multi-line prompt or code payload for execution..."
+                              class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-5 py-4 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-mono resize-none shadow-sm"></textarea>
+                    <button onclick="sendMercenary()" class="bg-blue-600 hover:bg-blue-500 text-white h-[88px] px-8 rounded-lg text-xs font-bold uppercase tracking-widest transition-all shadow-md shadow-blue-900/20">Execute</button>
+                </div>
             </div>
-            <!-- Chat Output -->
-            <div id="merc-output" class="flex-1 overflow-y-auto bg-gray-900/60 border border-gray-700 rounded-lg p-4 text-sm space-y-3 min-0">
-                <div class="text-gray-600 italic text-xs">Mercenary Terminal ready. Select a provider and send a prompt.</div>
-            </div>
-            <!-- Chat Input -->
-            <div class="flex-shrink-0 flex items-center space-x-3">
-                <textarea id="merc-input" rows="2" placeholder="Enter prompt for cloud model..."
-                          class="flex-1 bg-gray-900/80 border border-gray-600 rounded px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none transition-colors resize-none"
-                          style="--tw-ring-color: var(--theme-merc);"></textarea>
-                <button onclick="sendMercenary()" class="hover:bg-purple-500 text-white px-6 py-3 rounded text-xs font-bold uppercase transition-all" style="background-color: var(--theme-merc);">Execute</button>
-            </div>
-        </div>
-    </main>
+        </main>
+    </div>
 
     <!-- ═══════════════════════════ JAVASCRIPT ═══════════════════════════ -->
     <script>
-        // ── Constants ──
         const PB_URL = 'http://127.0.0.1:8090';
         const ROUTER_URL = 'http://127.0.0.1:8000';
         const pb = new PocketBase(PB_URL);
         let currentSSE = null;
 
-        // ══════════════════════════════════════════════
-        // TAB SWITCHING (content-visibility for layout caching)
-        // ══════════════════════════════════════════════
+        // ── Tab Logic (content-visibility) ──
         const tabs = ['bus', 'news', 'merc'];
 
         function switchTab(name) {
             tabs.forEach(t => {
                 const isMatch = t === name;
-                document.getElementById(`tab-${t}`).className = `flex flex-col min-0 ${isMatch ? 'pane-visible' : 'pane-hidden'}`;
+                // Toggle view state engine
+                document.getElementById(`tab-${t}`).className = `tab-pane min-h-0 bg-gray-950 ${isMatch ? 'pane-visible' : 'pane-hidden'}`;
                 
+                // Visual Feedback (Emerald-500 for active, Gray-400 for inactive)
                 const btn = document.getElementById(`btn-${t}`);
                 if (isMatch) {
-                    btn.className = 'pb-2 tab-active transition-colors uppercase';
-                    if (t === 'bus') btn.style.borderBottomColor = 'var(--theme-bus)';
-                    else if (t === 'merc') btn.style.borderBottomColor = 'var(--theme-merc)';
-                    else btn.style.borderBottomColor = '#10b981'; // default active
+                    btn.className = 'border-b-2 border-emerald-500 text-emerald-500 pb-2 transition-colors uppercase';
+                    if(t === 'merc') btn.className = 'border-b-2 border-blue-500 text-blue-500 pb-2 transition-colors uppercase';
                 } else {
-                    btn.className = 'pb-2 tab-inactive transition-colors uppercase';
-                    btn.style.borderBottomColor = 'transparent';
+                    btn.className = 'border-b-2 border-transparent text-gray-400 hover:text-gray-200 pb-2 transition-colors uppercase';
                 }
             });
             if (name === 'news') loadNews();
         }
 
-        // ══════════════════════════════════════════════
-        // TAB 1: COGNITIVE BUS — PocketBase SSE Chat
-        // ══════════════════════════════════════════════
+        // ── Tab 1: Cognitive Bus ──
         function appendBusMessage(role, text) {
             const container = document.getElementById('bus-messages');
             const isCEO = role === 'CEO';
             const bubble = document.createElement('div');
-            bubble.className = `flex flex-col ${isCEO ? 'items-end' : 'items-start'} animate-fade-in`;
+            
+            // Phase 3: Alignment & Bubbles (Blue-900/40 vs Emerald-900/40)
+            bubble.className = `flex flex-col ${isCEO ? 'items-end' : 'items-start'} animate-fade-in w-full`;
 
             let rendered = text;
             try { rendered = typeof marked !== 'undefined' ? marked.parse(text) : text; } catch(e) {}
 
             bubble.innerHTML = `
-                <div class="text-[10px] text-gray-500 mb-1 uppercase tracking-widest">${isCEO ? '🧑‍💼 CEO' : '🤖 Codex'}</div>
-                <div class="max-w-[75%] px-4 py-3 rounded-lg text-sm leading-relaxed ${isCEO ? 'bg-blue-900/40 border border-blue-800 text-blue-100 font-streaming' : 'bg-gray-800/60 border border-gray-700 text-gray-200 font-streaming'}">
-                    <div class="prose prose-invert prose-sm max-w-none">${rendered}</div>
+                <div class="text-[10px] text-gray-500 mb-1.5 uppercase tracking-widest font-bold">${isCEO ? '🧑‍💼 CEO' : '🤖 Codex'}</div>
+                <div class="max-w-[85%] px-5 py-4 rounded-2xl ${isCEO ? 'bg-blue-900/40 border border-blue-800/50 rounded-tr-sm' : 'bg-emerald-900/40 border border-emerald-800/50 rounded-tl-sm'}">
+                    <div class="prose prose-invert prose-sm max-w-none streaming-text ${isCEO ? 'text-blue-100' : 'text-emerald-50'}">${rendered}</div>
                 </div>`;
             container.appendChild(bubble);
             container.scrollTop = container.scrollHeight;
@@ -210,21 +228,17 @@
             if (!text) return;
             input.value = '';
 
+            try { await pb.collection('transcripts').create({ role: 'CEO', text: text }); } catch(e) {}
             try {
-                await pb.collection('transcripts').create({ role: 'CEO', text: text });
-            } catch(e) { console.error('[BUS] PB push failed:', e); }
-
-            try {
-                const res = await fetch(`${ROUTER_URL}/api/chat`, {
+                await fetch(`${ROUTER_URL}/api/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ prompt: text })
                 });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            } catch(e) { console.error('[BUS] API send failed:', e); }
+            } catch(e) {}
         }
 
-        // ── SSE Realtime Engine & Telemetry ──
+        // ── SSE & Network ──
         function initSSE() {
             const statusEl = document.getElementById('sse-status');
             if (currentSSE) currentSSE.close();
@@ -234,16 +248,14 @@
 
             sse.addEventListener('PB_CONNECT', (e) => {
                 try {
-                    const data = JSON.parse(e.data);
-                    const clientId = data.clientId;
-                    statusEl.innerHTML = '<span class="text-green-400 font-bold">LIVE</span>';
-
+                    const clientId = JSON.parse(e.data).clientId;
+                    statusEl.innerHTML = '<span class="text-emerald-400 font-bold">STREAM LIVE</span>';
                     fetch(`${PB_URL}/api/realtime`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ clientId: clientId, subscriptions: ['transcripts'] })
-                    }).catch(err => console.error('[SSE] Sub failed:', err));
-                } catch(err) { console.error('[SSE] Connect parse error:', err); }
+                    }).catch(()=>{});
+                } catch(err) {}
             });
 
             sse.addEventListener('transcripts', (e) => {
@@ -252,7 +264,7 @@
                     if (payload.action === 'create' && payload.record) {
                         appendBusMessage(payload.record.role, payload.record.text);
                     }
-                } catch(err) { console.error('[SSE] Transcript parse error:', err); }
+                } catch(err) {}
             });
 
             sse.onerror = () => {
@@ -265,10 +277,9 @@
         async function checkPB() {
             try {
                 await pb.health.check();
-                document.getElementById('connection-status').innerHTML = '<span class="text-green-400 font-bold">● Bus Connected</span>';
-                document.getElementById('global-pulse').className = 'w-3 h-3 bg-green-500 rounded-full animate-pulse';
+                document.getElementById('connection-status').innerHTML = '<span class="text-emerald-400">● Core Online</span>';
+                document.getElementById('global-pulse').className = 'w-3 h-3 bg-emerald-500 rounded-full animate-pulse';
                 
-                // Clear and refresh history on connect
                 document.getElementById('bus-messages').innerHTML = '';
                 const records = await pb.collection('transcripts').getList(1, 50, { sort: 'created' });
                 records.items.forEach(r => appendBusMessage(r.role, r.text));
@@ -277,34 +288,11 @@
             } catch(e) {
                 document.getElementById('connection-status').innerHTML = '<span class="text-red-500">● Offline</span>';
                 document.getElementById('global-pulse').className = 'w-3 h-3 bg-red-500 rounded-full';
-                document.getElementById('sse-status').innerHTML = '<span class="text-red-500">OFFLINE</span>';
                 setTimeout(checkPB, 5000);
             }
         }
 
-        // ── Standby Awareness (Tauri resume) ──
-        if (window.__TAURI__ && window.__TAURI__.event) {
-            window.__TAURI__.event.listen('resume', () => {
-                console.log('[TELEMETRY] Tauri wake signal received. Re-establishing connection...');
-                checkPB();
-            });
-        }
-        
-        // Fallback for native browser wake
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                console.log('[TELEMETRY] Document visible. Checking connection...');
-                pb.health.check().then(() => {
-                    if (!currentSSE || currentSSE.readyState === EventSource.CLOSED) {
-                        checkPB();
-                    }
-                }).catch(() => {});
-            }
-        });
-
-        // ══════════════════════════════════════════════
-        // TAB 2: NEWS SUMMARY — Headlines + marked.js Reader
-        // ══════════════════════════════════════════════
+        // ── Tab 2: News Summary (Master-Detail) ──
         let newsArticles = [];
 
         async function loadNews() {
@@ -314,101 +302,85 @@
                 const records = await pb.collection('daily_briefs').getList(1, 30, { sort: '-created' });
                 newsArticles = records.items;
                 if (newsArticles.length === 0) {
-                    emptyEl.textContent = 'No briefs found.';
-                    emptyEl.className = 'text-gray-600 text-sm italic pane-visible';
+                    emptyEl.textContent = 'No intelligence briefs currently cached.';
+                    emptyEl.className = 'text-gray-500 text-sm italic pane-visible';
                     return;
                 }
                 emptyEl.className = 'pane-hidden';
                 container.innerHTML = '';
                 newsArticles.forEach((article, idx) => {
                     const card = document.createElement('div');
-                    card.className = 'bg-gray-800/60 border border-gray-700 rounded-lg p-4 cursor-pointer hover:border-green-600 hover:bg-gray-750/80 transition-all animate-fade-in';
+                    card.className = 'bg-gray-900 border border-gray-800 rounded-xl p-5 cursor-pointer hover:border-emerald-600 hover:bg-gray-800/80 transition-all animate-fade-in shadow-sm group';
                     card.onclick = () => openReader(idx);
 
-                    const title = article.title || article.headline || 'Untitled Brief';
+                    const title = article.title || article.headline || 'Encrypted Brief';
                     const summary = article.summary || article.text || '';
                     const date = new Date(article.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
                     card.innerHTML = `
                         <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <div class="text-white font-semibold text-sm mb-1">${title}</div>
-                                <div class="text-gray-400 text-xs leading-relaxed line-clamp-2 font-streaming">${summary.substring(0, 200)}${summary.length > 200 ? '...' : ''}</div>
+                            <div class="flex-1 pr-4">
+                                <div class="text-gray-100 font-bold text-base mb-2 group-hover:text-emerald-400 transition-colors">${title}</div>
+                                <div class="text-gray-400 text-sm leading-relaxed line-clamp-2 streaming-text">${summary.substring(0, 250)}${summary.length > 250 ? '...' : ''}</div>
                             </div>
-                            <div class="text-[10px] text-gray-600 ml-4 whitespace-nowrap">${date}</div>
+                            <div class="text-[10px] text-gray-500 whitespace-nowrap font-mono tracking-widest uppercase mt-1 border border-gray-700 px-2 py-1 rounded bg-gray-950">${date}</div>
                         </div>`;
                     container.appendChild(card);
                 });
-            } catch(e) {
-                emptyEl.textContent = 'Failed to load briefs. Is PocketBase online?';
-                console.error('[NEWS] Load failed:', e);
-            }
+            } catch(e) {}
         }
 
         function openReader(idx) {
             const article = newsArticles[idx];
             if (!article) return;
-
-            const title = article.title || article.headline || 'Untitled';
+            const title = article.title || article.headline || 'Brief';
             const content = article.longform || article.content || article.text || article.summary || '';
 
             document.getElementById('reader-title').textContent = title;
-            try {
-                document.getElementById('reader-content').innerHTML = marked.parse(content);
-            } catch(e) {
-                document.getElementById('reader-content').textContent = content;
-            }
+            try { document.getElementById('reader-content').innerHTML = marked.parse(content); } 
+            catch(e) { document.getElementById('reader-content').textContent = content; }
 
-            document.getElementById('news-list-view').className = 'flex-1 overflow-y-auto p-6 space-y-3 min-0 pane-hidden';
-            document.getElementById('news-reader-view').className = 'flex-1 flex flex-col min-0 pane-visible';
+            document.getElementById('news-list-view').className = 'flex-1 overflow-y-auto p-6 space-y-4 min-h-0 pane-hidden';
+            document.getElementById('news-reader-view').className = 'flex-1 flex flex-col min-h-0 pane-visible';
         }
 
         function closeReader() {
-            document.getElementById('news-reader-view').className = 'flex-1 flex flex-col min-0 pane-hidden';
-            document.getElementById('news-list-view').className = 'flex-1 overflow-y-auto p-6 space-y-3 min-0 pane-visible';
+            document.getElementById('news-reader-view').className = 'flex-1 flex flex-col min-h-0 pane-hidden';
+            document.getElementById('news-list-view').className = 'flex-1 overflow-y-auto p-6 space-y-4 min-h-0 pane-visible';
         }
 
-        // ══════════════════════════════════════════════
-        // TAB 3: MERCENARY TERMINAL — 21-Provider Cloud Gateway
-        // ══════════════════════════════════════════════
+        // ── Tab 3: Mercenary Terminal ──
         async function loadProviders() {
             try {
                 const res = await fetch(`${ROUTER_URL}/providers`);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
                 const select = document.getElementById('merc-provider');
                 select.innerHTML = '';
                 data.providers.forEach(p => {
                     const opt = document.createElement('option');
                     opt.value = p.provider;
-                    opt.textContent = `${p.provider} ${p.active ? '✓' : '✗'}`;
+                    opt.textContent = `${p.provider} ${p.active ? '🟢' : '⚫'}`;
                     opt.dataset.model = p.default_model;
-                    if (!p.active) opt.className = 'text-gray-600';
                     select.appendChild(opt);
                 });
-                select.onchange = () => {
-                    const selected = select.options[select.selectedIndex];
-                    document.getElementById('merc-model').value = selected.dataset.model || '';
-                };
+                select.onchange = () => { document.getElementById('merc-model').value = select.options[select.selectedIndex].dataset.model || ''; };
                 select.dispatchEvent(new Event('change'));
-            } catch(e) {
-                console.error('[MERC] Provider load failed:', e);
-            }
+            } catch(e) {}
         }
 
         function appendMercOutput(role, text) {
             const container = document.getElementById('merc-output');
             const div = document.createElement('div');
             const isUser = role === 'user';
-            div.className = `animate-fade-in ${isUser ? 'text-blue-300' : 'text-purple-300'}`;
+            div.className = `animate-fade-in w-full mb-4`;
 
             let rendered = text;
             try { rendered = typeof marked !== 'undefined' ? marked.parse(text) : text; } catch(e) {}
 
             div.innerHTML = `
-                <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1">${isUser ? '🧑‍💼 You' : '🤖 Cloud'}</div>
-                <div class="bg-gray-900/40 border ${isUser ? 'border-blue-800/50' : 'border-purple-800/50'} rounded px-4 py-3 text-sm font-streaming">
-                    <div class="prose prose-invert prose-sm max-w-none text-reading">${rendered}</div>
+                <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 font-bold">${isUser ? '🧑‍💻 YOU (TERMINAL)' : '☁️ CLOUD PAYLOAD'}</div>
+                <div class="bg-gray-950 border ${isUser ? 'border-gray-800' : 'border-blue-900/50'} rounded-lg px-5 py-4 text-sm streaming-text shadow-sm">
+                    <div class="prose prose-invert prose-sm max-w-none text-gray-300 ${isUser ? 'text-gray-400' : 'text-gray-200'}">${rendered}</div>
                 </div>`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
@@ -428,29 +400,17 @@
                 const res = await fetch(`${ROUTER_URL}/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        provider: provider,
-                        model: model || 'default',
-                        messages: [{ role: 'user', content: text }],
-                        temperature: 0.2
-                    })
+                    body: JSON.stringify({ provider, model: model || 'default', messages: [{ role: 'user', content: text }], temperature: 0.2 })
                 });
-                if (!res.ok) {
-                    const err = await res.text();
-                    appendMercOutput('system', `Error ${res.status}: ${err}`);
-                    return;
-                }
+                if (!res.ok) { appendMercOutput('system', `[SYS_ERR] ${res.status}: ${await res.text()}`); return; }
                 const data = await res.json();
-                const reply = data.choices?.[0]?.message?.content || JSON.stringify(data);
-                appendMercOutput('system', reply);
+                appendMercOutput('system', data.choices?.[0]?.message?.content || JSON.stringify(data));
             } catch(e) {
-                appendMercOutput('system', `Connection failed: ${e.message}`);
+                appendMercOutput('system', `[NET_ERR] ${e.message}`);
             }
         }
 
-        // ══════════════════════════════════════════════
-        // BOOT
-        // ══════════════════════════════════════════════
+        // ── Boot sequence ──
         checkPB();
         loadProviders();
     </script>
