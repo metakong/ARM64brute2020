@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="dark bg-transparent">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,91 +8,145 @@
     <script src="https://unpkg.com/pocketbase/dist/pocketbase.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
+        :root {
+            color-scheme: light dark;
+            --theme-bus: light-dark(#059669, #10b981);
+            --theme-merc: light-dark(#7c3aed, #8b5cf6);
+            --bg-glass: rgba(17, 24, 39, 0.7);
+        }
+        
+        /* Macro-Shell Architecture */
+        html, body {
+            overflow: hidden;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            background: transparent; /* Mica vibrancy root */
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
+        body {
+            display: grid;
+            grid-template-rows: 60px 1fr;
+        }
+
+        .min-0 {
+            min-width: 0;
+            min-height: 0;
+        }
+
+        .pane-hidden {
+            content-visibility: hidden;
+        }
+
+        .pane-visible {
+            content-visibility: visible;
+        }
+
+        /* Typography & Scrollbars */
         ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+        
         @keyframes fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fade-in 0.3s ease-out; }
-        .tab-active { border-bottom: 2px solid #10b981; color: #10b981; }
+        
+        .tab-active { border-bottom: 2px solid var(--theme-bus); color: var(--theme-bus); }
         .tab-inactive { border-bottom: 2px solid transparent; color: #9ca3af; }
         .tab-inactive:hover { color: #d1d5db; }
+
+        .prose { line-height: 1.65 !important; }
+        .font-streaming { font-weight: 300; }
+        .text-reading { color: #E5E7EB; }
+
+        /* All panes stack in grid row 2 */
+        main {
+            grid-row: 2;
+            grid-column: 1;
+        }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 h-screen flex flex-col font-mono">
+<body class="text-gray-100">
 
     <!-- ═══════════════════════════ HEADER ═══════════════════════════ -->
-    <header class="bg-gray-800 border-b border-gray-700 shadow-lg flex flex-col flex-shrink-0">
-        <div class="flex items-center justify-between px-6 py-3">
-            <div class="flex items-center space-x-3">
-                <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse" id="global-pulse"></div>
-                <h1 class="text-xl font-bold tracking-widest text-white">DSIE CODEX <span class="text-gray-400 text-sm">| DASHBOARD</span></h1>
+    <header class="border-b border-gray-700 shadow-lg flex flex-col justify-center min-0" 
+            style="background: var(--bg-glass); padding-right: var(--tauri-frame-controls-width, 0px); grid-row: 1;">
+        <div class="flex items-center justify-between px-6">
+            <div class="flex items-center space-x-6">
+                <div class="flex items-center space-x-3">
+                    <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse" id="global-pulse"></div>
+                    <h1 class="text-xl font-bold tracking-widest text-white">DSIE CODEX <span class="text-gray-400 text-sm">| DASHBOARD</span></h1>
+                </div>
+                <!-- TAB BAR (Integrated into Header Row) -->
+                <div class="flex space-x-6 text-sm font-semibold tracking-wider pt-2">
+                    <button id="btn-bus" onclick="switchTab('bus')" class="pb-2 tab-active transition-colors uppercase">Cognitive Bus</button>
+                    <button id="btn-news" onclick="switchTab('news')" class="pb-2 tab-inactive transition-colors uppercase">News Summary</button>
+                    <button id="btn-merc" onclick="switchTab('merc')" class="pb-2 tab-inactive transition-colors uppercase">Mercenary Terminal</button>
+                </div>
             </div>
-            <div class="text-sm text-gray-400 flex items-center space-x-4">
+            <div class="text-sm text-gray-400 flex flex-col items-end">
                 <div id="connection-status">Connecting to Bus...</div>
                 <div id="sse-status" class="text-[10px] text-gray-500 uppercase">SSE: Connecting...</div>
             </div>
         </div>
-        <!-- TAB BAR -->
-        <div class="flex space-x-6 px-6 bg-gray-800/80 text-sm font-semibold tracking-wider">
-            <button id="btn-bus" onclick="switchTab('bus')" class="pb-2 tab-active transition-colors uppercase">Cognitive Bus</button>
-            <button id="btn-news" onclick="switchTab('news')" class="pb-2 tab-inactive transition-colors uppercase">News Summary</button>
-            <button id="btn-merc" onclick="switchTab('merc')" class="pb-2 tab-inactive transition-colors uppercase">Mercenary Terminal</button>
-        </div>
     </header>
 
     <!-- ═══════════════════════════ TAB 1: COGNITIVE BUS ═══════════════════════════ -->
-    <main id="tab-bus" class="flex-1 flex flex-col overflow-hidden">
-        <div class="flex-1 overflow-y-auto p-6 space-y-4" id="bus-messages"></div>
-        <div class="flex-shrink-0 border-t border-gray-700 bg-gray-800 p-4 flex items-center space-x-3">
+    <main id="tab-bus" class="flex flex-col min-0 pane-visible" style="background: rgba(17, 24, 39, 0.4);">
+        <div class="flex-1 overflow-y-auto p-6 space-y-4 min-0" id="bus-messages"></div>
+        <div class="flex-shrink-0 border-t border-gray-700 p-4 flex items-center space-x-3" style="background: var(--bg-glass);">
             <input id="bus-input" type="text" placeholder="Send a command to Codex..."
-                   class="flex-1 bg-gray-900 border border-gray-600 rounded px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-colors"
+                   class="flex-1 bg-gray-900/80 border border-gray-600 rounded px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-colors"
                    onkeydown="if(event.key==='Enter')sendCommand()">
-            <button onclick="sendCommand()" class="bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded text-xs font-bold uppercase transition-all">Send</button>
+            <button onclick="sendCommand()" class="hover:bg-green-500 text-white px-6 py-2 rounded text-xs font-bold uppercase transition-all" style="background-color: var(--theme-bus);">Send</button>
         </div>
     </main>
 
     <!-- ═══════════════════════════ TAB 2: NEWS SUMMARY ═══════════════════════════ -->
-    <main id="tab-news" class="flex-1 flex flex-col overflow-hidden hidden">
+    <main id="tab-news" class="flex flex-col min-0 pane-hidden" style="background: rgba(17, 24, 39, 0.4);">
         <!-- State A: Headline List -->
-        <div id="news-list-view" class="flex-1 overflow-y-auto p-6 space-y-3">
+        <div id="news-list-view" class="flex-1 overflow-y-auto p-6 space-y-3 min-0">
             <div class="text-gray-500 text-sm uppercase tracking-widest mb-4">Latest Intelligence Briefs</div>
             <div id="news-headlines" class="space-y-3"></div>
             <div id="news-empty" class="text-gray-600 text-sm italic">Loading briefs from PocketBase...</div>
         </div>
         <!-- State B: Article Reader -->
-        <div id="news-reader-view" class="flex-1 flex flex-col overflow-hidden hidden">
-            <div class="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3 flex items-center space-x-4">
-                <button onclick="closeReader()" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-1.5 rounded text-xs font-bold uppercase transition-all">← Back to Headlines</button>
+        <div id="news-reader-view" class="flex-1 flex flex-col min-0 pane-hidden">
+            <div class="flex-shrink-0 border-b border-gray-700 px-6 py-3 flex items-center space-x-4" style="background: var(--bg-glass);">
+                <button onclick="closeReader()" class="bg-gray-700/80 hover:bg-gray-600 text-white px-4 py-1.5 rounded text-xs font-bold uppercase transition-all">← Back to Headlines</button>
                 <span id="reader-title" class="text-sm text-gray-400 truncate"></span>
             </div>
-            <div id="reader-content" class="flex-1 overflow-y-auto p-8 prose prose-invert prose-sm max-w-none"></div>
+            <div id="reader-content" class="flex-1 overflow-y-auto p-8 prose prose-invert prose-sm max-w-none text-reading min-0"></div>
         </div>
     </main>
 
     <!-- ═══════════════════════════ TAB 3: MERCENARY TERMINAL ═══════════════════════════ -->
-    <main id="tab-merc" class="flex-1 flex flex-col overflow-hidden hidden">
-        <div class="flex-1 flex flex-col p-6 space-y-4">
+    <main id="tab-merc" class="flex flex-col min-0 pane-hidden" style="background: rgba(17, 24, 39, 0.4);">
+        <div class="flex-1 flex flex-col p-6 space-y-4 min-0">
             <!-- Provider Select -->
-            <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-4 flex-shrink-0">
                 <label class="text-xs text-gray-400 uppercase tracking-wider font-bold">Provider:</label>
                 <select id="merc-provider"
-                        class="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-green-500 transition-colors">
+                        class="flex-1 bg-gray-800/80 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none transition-colors"
+                        style="--tw-ring-color: var(--theme-merc);">
                     <option value="">Loading providers...</option>
                 </select>
                 <label class="text-xs text-gray-400 uppercase tracking-wider font-bold">Model:</label>
                 <input id="merc-model" type="text" placeholder="auto"
-                       class="w-64 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-colors">
+                       class="w-64 bg-gray-800/80 border border-gray-600 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none transition-colors"
+                       style="--tw-ring-color: var(--theme-merc);">
             </div>
             <!-- Chat Output -->
-            <div id="merc-output" class="flex-1 overflow-y-auto bg-gray-800 border border-gray-700 rounded-lg p-4 text-sm space-y-3">
+            <div id="merc-output" class="flex-1 overflow-y-auto bg-gray-900/60 border border-gray-700 rounded-lg p-4 text-sm space-y-3 min-0">
                 <div class="text-gray-600 italic text-xs">Mercenary Terminal ready. Select a provider and send a prompt.</div>
             </div>
             <!-- Chat Input -->
             <div class="flex-shrink-0 flex items-center space-x-3">
                 <textarea id="merc-input" rows="2" placeholder="Enter prompt for cloud model..."
-                          class="flex-1 bg-gray-900 border border-gray-600 rounded px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-colors resize-none"></textarea>
-                <button onclick="sendMercenary()" class="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded text-xs font-bold uppercase transition-all">Execute</button>
+                          class="flex-1 bg-gray-900/80 border border-gray-600 rounded px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none transition-colors resize-none"
+                          style="--tw-ring-color: var(--theme-merc);"></textarea>
+                <button onclick="sendMercenary()" class="hover:bg-purple-500 text-white px-6 py-3 rounded text-xs font-bold uppercase transition-all" style="background-color: var(--theme-merc);">Execute</button>
             </div>
         </div>
     </main>
@@ -103,18 +157,28 @@
         const PB_URL = 'http://127.0.0.1:8090';
         const ROUTER_URL = 'http://127.0.0.1:8000';
         const pb = new PocketBase(PB_URL);
+        let currentSSE = null;
 
         // ══════════════════════════════════════════════
-        // TAB SWITCHING (uses `hidden` class — display:none)
+        // TAB SWITCHING (content-visibility for layout caching)
         // ══════════════════════════════════════════════
         const tabs = ['bus', 'news', 'merc'];
 
         function switchTab(name) {
             tabs.forEach(t => {
-                document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== name);
-                document.getElementById(`btn-${t}`).className = t === name
-                    ? 'pb-2 tab-active transition-colors uppercase'
-                    : 'pb-2 tab-inactive transition-colors uppercase';
+                const isMatch = t === name;
+                document.getElementById(`tab-${t}`).className = `flex flex-col min-0 ${isMatch ? 'pane-visible' : 'pane-hidden'}`;
+                
+                const btn = document.getElementById(`btn-${t}`);
+                if (isMatch) {
+                    btn.className = 'pb-2 tab-active transition-colors uppercase';
+                    if (t === 'bus') btn.style.borderBottomColor = 'var(--theme-bus)';
+                    else if (t === 'merc') btn.style.borderBottomColor = 'var(--theme-merc)';
+                    else btn.style.borderBottomColor = '#10b981'; // default active
+                } else {
+                    btn.className = 'pb-2 tab-inactive transition-colors uppercase';
+                    btn.style.borderBottomColor = 'transparent';
+                }
             });
             if (name === 'news') loadNews();
         }
@@ -133,7 +197,7 @@
 
             bubble.innerHTML = `
                 <div class="text-[10px] text-gray-500 mb-1 uppercase tracking-widest">${isCEO ? '🧑‍💼 CEO' : '🤖 Codex'}</div>
-                <div class="max-w-[75%] px-4 py-3 rounded-lg text-sm leading-relaxed ${isCEO ? 'bg-blue-900/50 border border-blue-800 text-blue-100' : 'bg-gray-800 border border-gray-700 text-gray-200'}">
+                <div class="max-w-[75%] px-4 py-3 rounded-lg text-sm leading-relaxed ${isCEO ? 'bg-blue-900/40 border border-blue-800 text-blue-100 font-streaming' : 'bg-gray-800/60 border border-gray-700 text-gray-200 font-streaming'}">
                     <div class="prose prose-invert prose-sm max-w-none">${rendered}</div>
                 </div>`;
             container.appendChild(bubble);
@@ -146,12 +210,10 @@
             if (!text) return;
             input.value = '';
 
-            // Instant local echo via PocketBase
             try {
                 await pb.collection('transcripts').create({ role: 'CEO', text: text });
             } catch(e) { console.error('[BUS] PB push failed:', e); }
 
-            // Fire to the Omni-Chat API
             try {
                 const res = await fetch(`${ROUTER_URL}/api/chat`, {
                     method: 'POST',
@@ -162,16 +224,19 @@
             } catch(e) { console.error('[BUS] API send failed:', e); }
         }
 
-        // ── SSE Realtime Engine ──
+        // ── SSE Realtime Engine & Telemetry ──
         function initSSE() {
             const statusEl = document.getElementById('sse-status');
+            if (currentSSE) currentSSE.close();
+            
             const sse = new EventSource(`${PB_URL}/api/realtime`);
+            currentSSE = sse;
 
             sse.addEventListener('PB_CONNECT', (e) => {
                 try {
                     const data = JSON.parse(e.data);
                     const clientId = data.clientId;
-                    statusEl.innerHTML = '<span class="text-green-400">LIVE</span>';
+                    statusEl.innerHTML = '<span class="text-green-400 font-bold">LIVE</span>';
 
                     fetch(`${PB_URL}/api/realtime`, {
                         method: 'POST',
@@ -197,17 +262,18 @@
             };
         }
 
-        // ── Initial PocketBase Connection Check ──
         async function checkPB() {
             try {
                 await pb.health.check();
-                document.getElementById('connection-status').innerHTML = '<span class="text-green-400">● Bus Connected</span>';
+                document.getElementById('connection-status').innerHTML = '<span class="text-green-400 font-bold">● Bus Connected</span>';
                 document.getElementById('global-pulse').className = 'w-3 h-3 bg-green-500 rounded-full animate-pulse';
-                initSSE();
-
-                // Load transcript history
+                
+                // Clear and refresh history on connect
+                document.getElementById('bus-messages').innerHTML = '';
                 const records = await pb.collection('transcripts').getList(1, 50, { sort: 'created' });
                 records.items.forEach(r => appendBusMessage(r.role, r.text));
+                
+                initSSE();
             } catch(e) {
                 document.getElementById('connection-status').innerHTML = '<span class="text-red-500">● Offline</span>';
                 document.getElementById('global-pulse').className = 'w-3 h-3 bg-red-500 rounded-full';
@@ -215,6 +281,26 @@
                 setTimeout(checkPB, 5000);
             }
         }
+
+        // ── Standby Awareness (Tauri resume) ──
+        if (window.__TAURI__ && window.__TAURI__.event) {
+            window.__TAURI__.event.listen('resume', () => {
+                console.log('[TELEMETRY] Tauri wake signal received. Re-establishing connection...');
+                checkPB();
+            });
+        }
+        
+        // Fallback for native browser wake
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                console.log('[TELEMETRY] Document visible. Checking connection...');
+                pb.health.check().then(() => {
+                    if (!currentSSE || currentSSE.readyState === EventSource.CLOSED) {
+                        checkPB();
+                    }
+                }).catch(() => {});
+            }
+        });
 
         // ══════════════════════════════════════════════
         // TAB 2: NEWS SUMMARY — Headlines + marked.js Reader
@@ -229,13 +315,14 @@
                 newsArticles = records.items;
                 if (newsArticles.length === 0) {
                     emptyEl.textContent = 'No briefs found.';
+                    emptyEl.className = 'text-gray-600 text-sm italic pane-visible';
                     return;
                 }
-                emptyEl.classList.add('hidden');
+                emptyEl.className = 'pane-hidden';
                 container.innerHTML = '';
                 newsArticles.forEach((article, idx) => {
                     const card = document.createElement('div');
-                    card.className = 'bg-gray-800 border border-gray-700 rounded-lg p-4 cursor-pointer hover:border-green-600 hover:bg-gray-750 transition-all animate-fade-in';
+                    card.className = 'bg-gray-800/60 border border-gray-700 rounded-lg p-4 cursor-pointer hover:border-green-600 hover:bg-gray-750/80 transition-all animate-fade-in';
                     card.onclick = () => openReader(idx);
 
                     const title = article.title || article.headline || 'Untitled Brief';
@@ -246,7 +333,7 @@
                         <div class="flex items-start justify-between">
                             <div class="flex-1">
                                 <div class="text-white font-semibold text-sm mb-1">${title}</div>
-                                <div class="text-gray-400 text-xs leading-relaxed line-clamp-2">${summary.substring(0, 200)}${summary.length > 200 ? '...' : ''}</div>
+                                <div class="text-gray-400 text-xs leading-relaxed line-clamp-2 font-streaming">${summary.substring(0, 200)}${summary.length > 200 ? '...' : ''}</div>
                             </div>
                             <div class="text-[10px] text-gray-600 ml-4 whitespace-nowrap">${date}</div>
                         </div>`;
@@ -272,13 +359,13 @@
                 document.getElementById('reader-content').textContent = content;
             }
 
-            document.getElementById('news-list-view').classList.add('hidden');
-            document.getElementById('news-reader-view').classList.remove('hidden');
+            document.getElementById('news-list-view').className = 'flex-1 overflow-y-auto p-6 space-y-3 min-0 pane-hidden';
+            document.getElementById('news-reader-view').className = 'flex-1 flex flex-col min-0 pane-visible';
         }
 
         function closeReader() {
-            document.getElementById('news-reader-view').classList.add('hidden');
-            document.getElementById('news-list-view').classList.remove('hidden');
+            document.getElementById('news-reader-view').className = 'flex-1 flex flex-col min-0 pane-hidden';
+            document.getElementById('news-list-view').className = 'flex-1 overflow-y-auto p-6 space-y-3 min-0 pane-visible';
         }
 
         // ══════════════════════════════════════════════
@@ -299,7 +386,6 @@
                     if (!p.active) opt.className = 'text-gray-600';
                     select.appendChild(opt);
                 });
-                // Auto-fill model on selection change
                 select.onchange = () => {
                     const selected = select.options[select.selectedIndex];
                     document.getElementById('merc-model').value = selected.dataset.model || '';
@@ -314,15 +400,15 @@
             const container = document.getElementById('merc-output');
             const div = document.createElement('div');
             const isUser = role === 'user';
-            div.className = `animate-fade-in ${isUser ? 'text-blue-300' : 'text-green-300'}`;
+            div.className = `animate-fade-in ${isUser ? 'text-blue-300' : 'text-purple-300'}`;
 
             let rendered = text;
             try { rendered = typeof marked !== 'undefined' ? marked.parse(text) : text; } catch(e) {}
 
             div.innerHTML = `
                 <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1">${isUser ? '🧑‍💼 You' : '🤖 Cloud'}</div>
-                <div class="bg-gray-900/50 border ${isUser ? 'border-blue-800' : 'border-green-800'} rounded px-4 py-3 text-sm">
-                    <div class="prose prose-invert prose-sm max-w-none">${rendered}</div>
+                <div class="bg-gray-900/40 border ${isUser ? 'border-blue-800/50' : 'border-purple-800/50'} rounded px-4 py-3 text-sm font-streaming">
+                    <div class="prose prose-invert prose-sm max-w-none text-reading">${rendered}</div>
                 </div>`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
