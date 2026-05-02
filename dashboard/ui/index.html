@@ -30,7 +30,7 @@
 
     <style>
         /* ════════════════════════════════════════════════
-           PHASE 1 & 2: MACRO-SKELETON & RESET
+           SAMSUNG GALAXY S24 ULTRA ONE UI 6.0 AESTHETIC
            ════════════════════════════════════════════════ */
         * {
             box-sizing: border-box;
@@ -42,16 +42,15 @@
             height: 100vh;
             width: 100vw;
             overflow: hidden;
-            /* Ultra-transparent for Windows 11 Mica integration */
-            background-color: rgba(3, 7, 18, 0.45); 
-            color: #f3f4f6; /* Gray-100 */
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #000000; /* Pure AMOLED Black */
+            color: #E8EAED;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
         }
 
         /* Root CSS Grid Scaffold */
         #app-root {
             display: grid;
-            /* Changed from 64px to auto to prevent Tauri titlebar padding blowout */
             grid-template-rows: auto 1fr;
             height: 100%;
             width: 100%;
@@ -60,23 +59,21 @@
         /* Grid Row 1: Header */
         header {
             grid-row: 1;
-            padding-top: calc(var(--tauri-titlebar-area-height, 0px) + 16px); /* Dynamic Hardware Frame */
-            padding-bottom: 16px;
+            padding-top: calc(var(--tauri-titlebar-area-height, 0px) + 12px);
+            padding-bottom: 12px;
         }
 
         /* Grid Row 2: Main Content Container */
         #main-content {
             grid-row: 2;
-            min-height: 0; /* Flexbox Blowout Protection */
-            display: grid; /* We use grid here to stack tabs */
+            min-height: 0; 
+            display: grid; 
         }
 
-        /* ════════════════════════════════════════════════
-           PHASE 3: VIEW STATE ENGINE
-           ════════════════════════════════════════════════ */
+        /* View State Engine */
         .pane-hidden { 
             content-visibility: hidden; 
-            visibility: hidden; /* Hard enforcement against WebView2 Ghost Text */
+            visibility: hidden; 
             position: absolute;
             pointer-events: none;
             opacity: 0;
@@ -91,7 +88,6 @@
             z-index: 10;
         }
 
-        /* All tabs occupy the same cell in main-content */
         .tab-section {
             grid-row: 1;
             grid-column: 1;
@@ -102,107 +98,133 @@
             min-height: 0;
         }
 
-        /* ════════════════════════════════════════════════
-           PHASE 4: TYPOGRAPHY & SCROLLBARS
-           ════════════════════════════════════════════════ */
-        .streaming-text {
-            font-weight: 300;
-            line-height: 1.6;
-        }
-
-        ::-webkit-scrollbar { width: 6px; }
+        /* Custom Scrollbars (Samsung style: invisible until hover, but we make them subtle) */
+        ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+        ::-webkit-scrollbar-thumb { background: #333333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555555; }
         
-        @keyframes fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fade-in 0.3s ease-out; }
+        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fade-in 0.3s cubic-bezier(0.2, 0, 0, 1); }
+
+        /* One UI specific elements */
+        .one-ui-card {
+            background-color: #121212;
+            border: 1px solid #1e1e1e;
+            border-radius: 20px; /* High border radius */
+        }
+        .one-ui-input {
+            background-color: #1c1c1e;
+            border: 1px solid transparent;
+            border-radius: 30px; /* Pill shape */
+        }
+        .one-ui-input:focus {
+            border-color: #3b82f6; /* Samsung distinct blue */
+            outline: none;
+        }
+        .one-ui-btn {
+            border-radius: 30px;
+            font-weight: 600;
+        }
+        .chat-bubble-ceo {
+            background-color: #005B9F; /* Samsung blue for user */
+            border-radius: 24px 24px 4px 24px;
+        }
+        .chat-bubble-codex {
+            background-color: #252525; /* Dark gray for receiver */
+            border-radius: 24px 24px 24px 4px;
+        }
     </style>
 </head>
-<body class="antialiased selection:bg-emerald-500/30">
+<body class="antialiased selection:bg-blue-500/30">
 
     <div id="app-root">
         <!-- ═══════════════════════════ HEADER ═══════════════════════════ -->
-        <header data-tauri-drag-region class="bg-gray-900/60 backdrop-blur-md border-b border-gray-800 shadow-lg flex items-center justify-between px-6 z-20">
-            <div class="flex items-center space-x-6 h-full">
-                <!-- Branding & Status -->
+        <header data-tauri-drag-region class="bg-[#000000] border-b border-[#1a1a1a] flex items-center justify-between px-6 z-20">
+            <div class="flex items-center space-x-6 pointer-events-none">
+                <!-- Branding -->
                 <div class="flex items-center space-x-3">
-                    <div class="w-3 h-3 bg-red-500 rounded-full" id="global-pulse"></div>
-                    <h1 class="text-lg font-bold tracking-widest text-white">DSIE CODEX <span class="text-gray-500 text-sm">| DASHBOARD</span></h1>
-                </div>
-                
-                <!-- 3-Tab Navigation -->
-                <div class="flex space-x-6 text-sm font-semibold tracking-wider h-full items-end">
-                    <button id="btn-bus" class="border-b-2 border-emerald-500 text-white pb-4 transition-colors uppercase">Cognitive Bus</button>
-                    <button id="btn-news" class="border-b-2 border-transparent text-gray-500 hover:text-gray-300 pb-4 transition-colors uppercase">News Summary</button>
-                    <button id="btn-merc" class="border-b-2 border-transparent text-gray-500 hover:text-gray-300 pb-4 transition-colors uppercase">Mercenary Terminal</button>
+                    <div class="w-2.5 h-2.5 bg-red-500 rounded-full" id="global-pulse"></div>
+                    <h1 class="text-xl font-bold tracking-tight text-white" style="letter-spacing: -0.5px;">Codex</h1>
                 </div>
             </div>
             
-            <div class="text-sm text-gray-400 flex flex-col items-end">
+            <!-- 3-Tab Navigation (pointer-events-auto so they can be clicked) -->
+            <div class="flex space-x-8 text-[15px] font-medium tracking-wide pt-2">
+                <button id="btn-bus" class="border-b-[3px] border-blue-500 text-blue-400 pb-2 transition-colors">Cognitive Bus</button>
+                <button id="btn-news" class="border-b-[3px] border-transparent text-gray-400 hover:text-gray-200 pb-2 transition-colors">News Summary</button>
+                <button id="btn-merc" class="border-b-[3px] border-transparent text-gray-400 hover:text-gray-200 pb-2 transition-colors">Mercenary Terminal</button>
+            </div>
+            
+            <div class="text-xs text-gray-400 flex flex-col items-end pointer-events-none">
                 <div id="connection-status" class="text-red-500 font-medium">Connecting...</div>
-                <div id="sse-status" class="text-[10px] text-gray-500 uppercase tracking-widest">SSE: Awaiting</div>
+                <div id="sse-status" class="text-[10px] text-gray-500 uppercase tracking-widest mt-0.5">SSE: Awaiting</div>
             </div>
         </header>
 
         <!-- Main Content Area where tabs stack -->
         <div id="main-content">
             <!-- ═══════════════════════════ TAB 1: COGNITIVE BUS ═══════════════════════════ -->
-            <section id="tab-bus" class="tab-section pane-visible">
+            <section id="tab-bus" class="tab-section pane-visible bg-[#000000]">
                 <div class="flex-1 overflow-y-auto p-6 space-y-6 min-h-0 flex flex-col" id="bus-messages">
                     <!-- Chat History renders here -->
                 </div>
                 
-                <div class="flex-shrink-0 border-t border-gray-800 bg-gray-900 p-4 flex items-center space-x-3 z-20">
-                    <input id="bus-input" type="text" placeholder="Send a command to Codex..."
-                           class="flex-1 bg-gray-950 border border-gray-700 rounded px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 transition-all font-mono">
-                    <button id="btn-send-bus" class="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded text-xs font-bold uppercase tracking-wider transition-all">Send</button>
+                <div class="flex-shrink-0 bg-[#000000] p-4 pb-6 flex items-center space-x-3 z-20 border-t border-[#1a1a1a]">
+                    <input id="bus-input" type="text" placeholder="Type a message..."
+                           class="flex-1 one-ui-input px-6 py-3.5 text-[15px] text-white placeholder-gray-500 transition-all">
+                    <button id="btn-send-bus" class="bg-blue-600 hover:bg-blue-500 text-white px-7 py-3.5 one-ui-btn transition-all flex items-center justify-center">
+                        <svg class="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                    </button>
                 </div>
             </section>
 
             <!-- ═══════════════════════════ TAB 2: NEWS SUMMARY ═══════════════════════════ -->
-            <section id="tab-news" class="tab-section pane-hidden">
+            <section id="tab-news" class="tab-section pane-hidden bg-[#000000]">
                 <div class="flex-1 flex flex-col min-h-0 relative">
                     <!-- State A: List View -->
                     <div id="news-list-view" class="flex-1 overflow-y-auto p-6 space-y-4 min-h-0 pane-visible">
-                        <div class="text-emerald-500 text-xs font-bold uppercase tracking-widest mb-6">Latest Intelligence Briefs</div>
+                        <div class="text-blue-500 text-sm font-semibold tracking-wide mb-6 px-1">Latest Intelligence Briefs</div>
                         <div id="news-headlines" class="space-y-4"></div>
-                        <div id="news-empty" class="text-gray-500 text-sm italic">Loading briefs...</div>
+                        <div id="news-empty" class="text-gray-500 text-sm px-1">Loading briefs...</div>
                     </div>
                     
                     <!-- State B: Reading Pane -->
-                    <div id="news-reader-view" class="absolute inset-0 bg-gray-950 z-20 flex flex-col min-h-0 pane-hidden">
-                        <div class="flex-shrink-0 border-b border-gray-800 bg-gray-900 px-6 py-4 flex items-center space-x-4 shadow-sm">
-                            <button id="btn-close-reader" class="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-all">← Back</button>
-                            <span id="reader-title" class="text-sm font-medium text-emerald-400 truncate"></span>
+                    <div id="news-reader-view" class="absolute inset-0 bg-[#000000] z-20 flex flex-col min-h-0 pane-hidden">
+                        <div class="flex-shrink-0 bg-[#000000] border-b border-[#1a1a1a] px-4 py-4 flex items-center space-x-4 shadow-sm">
+                            <button id="btn-close-reader" class="text-blue-500 font-medium px-2 py-1 rounded hover:bg-[#1a1a1a] transition-colors flex items-center">
+                                <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                                Back
+                            </button>
+                            <span id="reader-title" class="text-[17px] font-semibold text-white truncate"></span>
                         </div>
-                        <div id="reader-content" class="flex-1 overflow-y-auto p-8 prose prose-invert max-w-4xl mx-auto streaming-text min-h-0 text-gray-300"></div>
+                        <div id="reader-content" class="flex-1 overflow-y-auto p-8 prose prose-invert max-w-3xl mx-auto min-h-0 text-[#E8EAED]"></div>
                     </div>
                 </div>
             </section>
 
             <!-- ═══════════════════════════ TAB 3: MERCENARY TERMINAL ═══════════════════════════ -->
-            <section id="tab-merc" class="tab-section pane-hidden">
-                <div class="flex-1 flex flex-col p-6 space-y-6 min-h-0">
-                    <div class="flex items-center space-x-4 flex-shrink-0 bg-gray-900 p-4 rounded border border-gray-800 z-10">
-                        <label class="text-xs text-gray-500 uppercase tracking-widest font-bold">Cloud Edge:</label>
+            <section id="tab-merc" class="tab-section pane-hidden bg-[#000000]">
+                <div class="flex-1 flex flex-col p-6 space-y-5 min-h-0 max-w-5xl mx-auto w-full">
+                    <div class="flex items-center space-x-4 flex-shrink-0 one-ui-card p-4 z-10">
+                        <label class="text-xs text-gray-400 uppercase tracking-widest font-semibold ml-2">Cloud Edge</label>
                         <select id="merc-provider"
-                                class="flex-1 bg-gray-800 border border-gray-700 rounded px-4 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500 transition-colors">
+                                class="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-blue-500 transition-colors">
                             <option value="">Scanning nexus nodes...</option>
                         </select>
-                        <label class="text-xs text-gray-500 uppercase tracking-widest font-bold ml-4">Model:</label>
+                        <label class="text-xs text-gray-400 uppercase tracking-widest font-semibold ml-4">Model</label>
                         <input id="merc-model" type="text" placeholder="auto"
-                               class="w-64 bg-gray-800 border border-gray-700 rounded px-4 py-2 text-sm text-gray-400 focus:outline-none focus:border-blue-500 transition-colors font-mono">
+                               class="w-64 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2.5 text-sm text-gray-300 focus:outline-none focus:border-blue-500 transition-colors font-mono">
                     </div>
                     
-                    <div id="merc-output" class="flex-1 overflow-y-auto bg-gray-900 border border-gray-800 rounded p-6 space-y-4 min-h-0">
+                    <div id="merc-output" class="flex-1 overflow-y-auto one-ui-card p-6 space-y-4 min-h-0">
                         <div class="text-blue-500/50 italic text-xs uppercase tracking-widest">Mercenary Terminal Online. Awaiting directive.</div>
                     </div>
                     
-                    <div class="flex-shrink-0 flex items-start space-x-4 z-10">
-                        <textarea id="merc-input" rows="4" placeholder="Enter multi-line prompt for execution..."
-                                  class="flex-1 bg-gray-900 border border-gray-700 rounded px-5 py-4 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-all font-mono resize-none"></textarea>
-                        <button id="btn-send-merc" class="bg-blue-600 hover:bg-blue-500 text-white h-[98px] px-8 rounded text-xs font-bold uppercase tracking-widest transition-all">Execute</button>
+                    <div class="flex-shrink-0 flex items-start space-x-3 z-10 pb-2">
+                        <textarea id="merc-input" rows="3" placeholder="Enter multi-line prompt for execution..."
+                                  class="flex-1 one-ui-card px-5 py-4 text-[15px] text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-all resize-none"></textarea>
+                        <button id="btn-send-merc" class="bg-blue-600 hover:bg-blue-500 text-white h-full min-h-[80px] px-8 one-ui-btn tracking-wide transition-all">Execute</button>
                     </div>
                 </div>
             </section>
@@ -221,27 +243,25 @@
             console.error('[CORE] Failed to instantiate PocketBase:', e);
         }
 
-        let currentSSE = null;
-
         // ── Tab Logic (content-visibility) ──
         const tabs = ['bus', 'news', 'merc'];
 
         function switchTab(name) {
             tabs.forEach(t => {
                 const isMatch = t === name;
-                document.getElementById(`tab-${t}`).className = `tab-section ${isMatch ? 'pane-visible' : 'pane-hidden'}`;
+                document.getElementById(`tab-${t}`).className = `tab-section ${isMatch ? 'pane-visible' : 'pane-hidden'} bg-[#000000]`;
                 
                 const btn = document.getElementById(`btn-${t}`);
                 if (isMatch) {
-                    btn.className = `border-b-2 ${t === 'merc' ? 'border-blue-500 text-white' : 'border-emerald-500 text-white'} pb-4 transition-colors uppercase`;
+                    btn.className = `border-b-[3px] border-blue-500 text-blue-400 pb-2 transition-colors`;
                 } else {
-                    btn.className = 'border-b-2 border-transparent text-gray-500 hover:text-gray-300 pb-4 transition-colors uppercase';
+                    btn.className = 'border-b-[3px] border-transparent text-gray-400 hover:text-gray-200 pb-2 transition-colors';
                 }
             });
             if (name === 'news') loadNews();
         }
 
-        // Add event listeners (Bypass Tauri CSP block on inline handlers)
+        // Add event listeners
         document.getElementById('btn-bus').addEventListener('click', () => switchTab('bus'));
         document.getElementById('btn-news').addEventListener('click', () => switchTab('news'));
         document.getElementById('btn-merc').addEventListener('click', () => switchTab('merc'));
@@ -256,16 +276,18 @@
             const isCEO = role === 'CEO';
             const bubble = document.createElement('div');
             
-            // User right (Dark Blue/900), Codex left (Dark Emerald/900)
-            bubble.className = `flex flex-col ${isCEO ? 'items-end' : 'items-start'} animate-fade-in w-full`;
+            bubble.className = `flex flex-col ${isCEO ? 'items-end' : 'items-start'} animate-fade-in w-full mt-2`;
 
             let rendered = text;
             try { rendered = typeof marked !== 'undefined' ? marked.parse(text) : text; } catch(e) {}
 
+            const bubbleClass = isCEO ? 'chat-bubble-ceo text-white' : 'chat-bubble-codex text-[#E8EAED]';
+            const nameLabel = isCEO ? 'You' : 'Codex';
+
             bubble.innerHTML = `
-                <div class="text-[10px] text-gray-500 mb-1.5 uppercase tracking-widest font-bold">${isCEO ? '🧑‍💼 CEO' : '🤖 Codex'}</div>
-                <div class="max-w-[85%] px-5 py-4 rounded-xl ${isCEO ? 'bg-blue-900 border border-blue-800' : 'bg-emerald-900 border border-emerald-800'}">
-                    <div class="prose prose-invert prose-sm max-w-none streaming-text text-gray-100">${rendered}</div>
+                <div class="text-[11px] text-gray-500 mb-1 ml-1 mr-1 font-medium">${nameLabel}</div>
+                <div class="max-w-[85%] px-5 py-3.5 ${bubbleClass} shadow-sm">
+                    <div class="prose prose-invert prose-sm max-w-none">${rendered}</div>
                 </div>`;
             container.appendChild(bubble);
             container.scrollTop = container.scrollHeight;
@@ -287,51 +309,6 @@
             } catch(e) {}
         }
 
-        // ── SSE & Network ──
-        function initSSE() {
-            const statusEl = document.getElementById('sse-status');
-            const pulse = document.getElementById('global-pulse');
-            const connStatus = document.getElementById('connection-status');
-            
-            if (currentSSE) currentSSE.close();
-            
-            // Direct Connection specified in Phase 5
-            const sse = new EventSource(`${PB_URL}/api/realtime`);
-            currentSSE = sse;
-
-            sse.addEventListener('PB_CONNECT', (e) => {
-                try {
-                    const clientId = JSON.parse(e.data).clientId;
-                    statusEl.innerHTML = '<span class="text-emerald-400 font-bold">STREAM LIVE</span>';
-                    connStatus.innerHTML = '<span class="text-emerald-400">● Bus Connected</span>';
-                    pulse.className = 'w-3 h-3 bg-emerald-500 rounded-full animate-pulse';
-                    
-                    fetch(`${PB_URL}/api/realtime`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ clientId: clientId, subscriptions: ['transcripts'] })
-                    }).catch(()=>{});
-                } catch(err) {}
-            });
-
-            sse.addEventListener('transcripts', (e) => {
-                try {
-                    const payload = JSON.parse(e.data);
-                    if (payload.action === 'create' && payload.record) {
-                        appendBusMessage(payload.record.role, payload.record.text);
-                    }
-                } catch(err) {}
-            });
-
-            sse.onerror = () => {
-                statusEl.innerHTML = '<span class="text-red-500">OFFLINE</span>';
-                connStatus.innerHTML = '<span class="text-red-500">● Disconnected</span>';
-                pulse.className = 'w-3 h-3 bg-red-500 rounded-full'; // solid red, no pulse
-                sse.close();
-                setTimeout(initSSE, 5000);
-            };
-        }
-
         async function checkPB() {
             try {
                 if(!pb) throw new Error("PocketBase uninitialized");
@@ -341,11 +318,21 @@
                 const records = await pb.collection('transcripts').getList(1, 50, { sort: 'created' });
                 records.items.forEach(r => appendBusMessage(r.role, r.text));
                 
-                initSSE();
+                // RESTORED: Official PocketBase SDK Realtime Subscription for Bulletproof Streaming!
+                pb.collection('transcripts').subscribe('*', function (e) {
+                    if (e.action === 'create' && e.record) {
+                        appendBusMessage(e.record.role, e.record.text);
+                    }
+                });
+                
+                document.getElementById('sse-status').innerHTML = '<span class="text-blue-400 font-semibold">Live Sync Active</span>';
+                document.getElementById('connection-status').innerHTML = '<span class="text-blue-400 font-semibold">● Connected</span>';
+                document.getElementById('global-pulse').className = 'w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse';
+
             } catch(e) {
-                document.getElementById('connection-status').innerHTML = '<span class="text-red-500">● Offline</span>';
-                document.getElementById('global-pulse').className = 'w-3 h-3 bg-red-500 rounded-full';
-                document.getElementById('sse-status').innerHTML = '<span class="text-red-500">OFFLINE</span>';
+                document.getElementById('connection-status').innerHTML = '<span class="text-gray-500 font-medium">● Offline</span>';
+                document.getElementById('global-pulse').className = 'w-2.5 h-2.5 bg-gray-600 rounded-full';
+                document.getElementById('sse-status').innerHTML = '<span class="text-gray-600">Reconnecting...</span>';
                 setTimeout(checkPB, 5000);
             }
         }
@@ -357,42 +344,40 @@
             const container = document.getElementById('news-headlines');
             const emptyEl = document.getElementById('news-empty');
             try {
-                // Fetch directly from router API to read the live file, bypassing Tauri bundle cache!
                 const res = await fetch(`${ROUTER_URL}/api/briefs`);
                 const records = await res.json();
                 newsArticles = records;
                 
                 if (!Array.isArray(newsArticles) || newsArticles.length === 0) {
                     emptyEl.textContent = 'No intelligence briefs currently cached.';
-                    emptyEl.className = 'text-gray-500 text-sm italic pane-visible';
+                    emptyEl.className = 'text-gray-500 text-sm px-1 pane-visible';
                     return;
                 }
                 emptyEl.className = 'pane-hidden';
                 container.innerHTML = '';
                 newsArticles.forEach((article, idx) => {
                     const card = document.createElement('div');
-                    card.className = 'bg-gray-900 border border-gray-800 rounded p-5 cursor-pointer hover:border-emerald-600 transition-all animate-fade-in shadow-sm';
+                    card.className = 'one-ui-card p-5 cursor-pointer hover:bg-[#1a1a1a] transition-all animate-fade-in';
                     card.addEventListener('click', () => openReader(idx));
 
                     const title = article.cluster_topic || article.title || article.headline || 'Encrypted Brief';
                     const summary = article.executive_summary || article.summary || article.text || '';
                     
-                    const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
                     card.innerHTML = `
                         <div class="flex items-start justify-between">
                             <div class="flex-1 pr-4">
-                                <div class="text-gray-100 font-bold text-base mb-2">${title}</div>
-                                <div class="text-gray-400 text-sm leading-relaxed line-clamp-2 streaming-text">${summary.substring(0, 250)}${summary.length > 250 ? '...' : ''}</div>
+                                <div class="text-white font-semibold text-[16px] mb-1.5">${title}</div>
+                                <div class="text-gray-400 text-[14px] leading-relaxed line-clamp-2">${summary.substring(0, 250)}${summary.length > 250 ? '...' : ''}</div>
                             </div>
-                            <div class="text-[10px] text-gray-500 whitespace-nowrap font-mono tracking-widest uppercase mt-1 border border-gray-700 px-2 py-1 rounded bg-gray-950">${date}</div>
+                            <div class="text-[12px] text-gray-500 font-medium mt-1 bg-[#1a1a1a] px-2.5 py-1 rounded-md">${date}</div>
                         </div>`;
                     container.appendChild(card);
                 });
             } catch(e) {
-                emptyEl.textContent = 'Failed to load briefs from Router. File not found or offline.';
-                emptyEl.className = 'text-red-500 text-sm italic pane-visible';
-                console.error('[NEWS]', e);
+                emptyEl.textContent = 'Failed to load briefs from core service.';
+                emptyEl.className = 'text-red-400 text-sm px-1 pane-visible';
             }
         }
 
@@ -407,11 +392,11 @@
             catch(e) { document.getElementById('reader-content').textContent = content; }
 
             document.getElementById('news-list-view').className = 'flex-1 overflow-y-auto p-6 space-y-4 min-h-0 pane-hidden';
-            document.getElementById('news-reader-view').className = 'absolute inset-0 bg-gray-950 z-20 flex flex-col min-h-0 pane-visible';
+            document.getElementById('news-reader-view').className = 'absolute inset-0 bg-[#000000] z-20 flex flex-col min-h-0 pane-visible';
         }
 
         function closeReader() {
-            document.getElementById('news-reader-view').className = 'absolute inset-0 bg-gray-950 z-20 flex flex-col min-h-0 pane-hidden';
+            document.getElementById('news-reader-view').className = 'absolute inset-0 bg-[#000000] z-20 flex flex-col min-h-0 pane-hidden';
             document.getElementById('news-list-view').className = 'flex-1 overflow-y-auto p-6 space-y-4 min-h-0 pane-visible';
         }
 
@@ -438,15 +423,15 @@
             const container = document.getElementById('merc-output');
             const div = document.createElement('div');
             const isUser = role === 'user';
-            div.className = `animate-fade-in w-full mb-4`;
+            div.className = `animate-fade-in w-full mb-5`;
 
             let rendered = text;
             try { rendered = typeof marked !== 'undefined' ? marked.parse(text) : text; } catch(e) {}
 
             div.innerHTML = `
-                <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 font-bold">${isUser ? '🧑‍💻 YOU (TERMINAL)' : '☁️ CLOUD PAYLOAD'}</div>
-                <div class="bg-gray-950 border ${isUser ? 'border-gray-800' : 'border-blue-900'} rounded px-5 py-4 text-sm streaming-text">
-                    <div class="prose prose-invert prose-sm max-w-none ${isUser ? 'text-gray-400' : 'text-gray-200'}">${rendered}</div>
+                <div class="text-[12px] text-gray-500 font-semibold mb-2 ml-1">${isUser ? 'You' : 'Cloud Handoff'}</div>
+                <div class="${isUser ? 'bg-[#1a1a1a] border border-[#2a2a2a]' : 'bg-[#002a4d] border border-[#003d73]'} rounded-2xl px-6 py-5 text-[15px]">
+                    <div class="prose prose-invert prose-sm max-w-none ${isUser ? 'text-gray-300' : 'text-gray-100'}">${rendered}</div>
                 </div>`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;

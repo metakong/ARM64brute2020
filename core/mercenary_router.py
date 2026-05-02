@@ -213,10 +213,14 @@ async def omni_chat(req: PromptRequest, background_tasks: BackgroundTasks):
 @app.get("/api/briefs")
 def get_briefs():
     import json
-    briefs_path = os.path.join(os.path.dirname(__file__), "..", "dashboard", "consolidated_briefs.json")
-    if os.path.exists(briefs_path):
-        with open(briefs_path, "r", encoding="utf-8") as f:
-            return json.load(f)
+    # Look in dashboard/ui first, then dashboard
+    path_ui = os.path.join(os.path.dirname(__file__), "..", "dashboard", "ui", "consolidated_briefs.json")
+    path_root = os.path.join(os.path.dirname(__file__), "..", "dashboard", "consolidated_briefs.json")
+    
+    for briefs_path in [path_ui, path_root]:
+        if os.path.exists(briefs_path):
+            with open(briefs_path, "r", encoding="utf-8") as f:
+                return json.load(f)
     return []
 
 if __name__ == "__main__":
