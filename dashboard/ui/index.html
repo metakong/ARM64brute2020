@@ -3,10 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' tauri: http://tauri.localhost; connect-src 'self' http://127.0.0.1:8090 http://127.0.0.1:8000 ws://127.0.0.1:8090 ws://127.0.0.1:8000; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline';">
     <title>DSIE Codex | CEO Dashboard</title>
+    
+    <!-- Tailwind Play CDN with Typography -->
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script src="https://unpkg.com/pocketbase/dist/pocketbase.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -14,6 +18,7 @@
                 extend: {
                     colors: {
                         gray: {
+                            900: '#111827',
                             950: '#030712'
                         }
                     }
@@ -21,21 +26,27 @@
             }
         }
     </script>
+
     <style>
         /* ════════════════════════════════════════════════
-           PHASE 1: MACRO-STRUCTURAL SCAFFOLDING
+           PHASE 1 & 2: MACRO-SKELETON & RESET
            ════════════════════════════════════════════════ */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         html, body {
             height: 100vh;
             width: 100vw;
-            margin: 0;
-            padding: 0;
             overflow: hidden;
+            background-color: #030712; /* Gray-950 background */
+            color: #f3f4f6; /* Gray-100 */
             font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: #030712; /* Gray-950 */
         }
 
-        /* The Rigid Shell */
+        /* Root CSS Grid Scaffold */
         #app-root {
             display: grid;
             grid-template-rows: 64px 1fr;
@@ -43,38 +54,43 @@
             width: 100%;
         }
 
-        /* Flexbox Blowout Protection */
-        .min-h-0 {
-            min-height: 0;
+        /* Grid Row 1: Header */
+        header {
+            grid-row: 1;
+            padding-top: var(--tauri-titlebar-area-height, 0px); /* Hardware Frame */
+        }
+
+        /* Grid Row 2: Main Content Container */
+        #main-content {
+            grid-row: 2;
+            min-height: 0; /* Flexbox Blowout Protection */
+            display: grid; /* We use grid here to stack tabs */
         }
 
         /* ════════════════════════════════════════════════
-           PHASE 2: VIEW STATE ENGINE (content-visibility)
+           PHASE 3: VIEW STATE ENGINE
            ════════════════════════════════════════════════ */
         .pane-hidden { content-visibility: hidden; }
         .pane-visible { content-visibility: visible; }
 
-        /* All panes stack in grid row 2 */
-        .tab-pane {
-            grid-row: 2;
+        /* All tabs occupy the same cell in main-content */
+        .tab-section {
+            grid-row: 1;
             grid-column: 1;
             display: flex;
             flex-direction: column;
             height: 100%;
+            min-height: 0;
         }
 
         /* ════════════════════════════════════════════════
-           PHASE 4: TYPOGRAPHY & READABILITY
+           PHASE 4: TYPOGRAPHY & SCROLLBARS
            ════════════════════════════════════════════════ */
         .streaming-text {
             font-weight: 300;
-            line-height: 1.65;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            line-height: 1.6;
         }
 
-        .prose { line-height: 1.65 !important; }
-
-        /* Scrollbars */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
@@ -84,93 +100,95 @@
         .animate-fade-in { animation: fade-in 0.3s ease-out; }
     </style>
 </head>
-<body class="text-gray-100 antialiased selection:bg-emerald-500/30">
+<body class="antialiased selection:bg-emerald-500/30">
 
     <div id="app-root">
         <!-- ═══════════════════════════ HEADER ═══════════════════════════ -->
-        <header class="bg-gray-900 border-b border-gray-800 shadow-lg flex items-center justify-between px-6" style="grid-row: 1;">
+        <header class="bg-gray-900 border-b border-gray-800 shadow-lg flex items-center justify-between px-6 z-10">
             <div class="flex items-center space-x-6 h-full">
+                <!-- Branding & Status -->
                 <div class="flex items-center space-x-3">
-                    <div class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse" id="global-pulse"></div>
-                    <h1 class="text-xl font-bold tracking-widest text-white">DSIE CODEX <span class="text-gray-500 text-sm">| DASHBOARD</span></h1>
+                    <div class="w-3 h-3 bg-red-500 rounded-full" id="global-pulse"></div>
+                    <h1 class="text-lg font-bold tracking-widest text-white">DSIE CODEX <span class="text-gray-500 text-sm">| DASHBOARD</span></h1>
                 </div>
                 
-                <!-- 3-Tab Navigation Menu -->
-                <div class="flex space-x-6 text-sm font-semibold tracking-wider h-full pt-5">
-                    <button id="btn-bus" onclick="switchTab('bus')" class="border-b-2 border-emerald-500 text-emerald-500 pb-2 transition-colors uppercase">Cognitive Bus</button>
-                    <button id="btn-news" onclick="switchTab('news')" class="border-b-2 border-transparent text-gray-400 hover:text-gray-200 pb-2 transition-colors uppercase">News Summary</button>
-                    <button id="btn-merc" onclick="switchTab('merc')" class="border-b-2 border-transparent text-gray-400 hover:text-gray-200 pb-2 transition-colors uppercase">Mercenary Terminal</button>
+                <!-- 3-Tab Navigation -->
+                <div class="flex space-x-6 text-sm font-semibold tracking-wider h-full items-end">
+                    <button id="btn-bus" onclick="switchTab('bus')" class="border-b-2 border-emerald-500 text-white pb-4 transition-colors uppercase">Cognitive Bus</button>
+                    <button id="btn-news" onclick="switchTab('news')" class="border-b-2 border-transparent text-gray-500 hover:text-gray-300 pb-4 transition-colors uppercase">News Summary</button>
+                    <button id="btn-merc" onclick="switchTab('merc')" class="border-b-2 border-transparent text-gray-500 hover:text-gray-300 pb-4 transition-colors uppercase">Mercenary Terminal</button>
                 </div>
             </div>
             
             <div class="text-sm text-gray-400 flex flex-col items-end">
-                <div id="connection-status" class="text-emerald-500 font-medium">Connecting...</div>
+                <div id="connection-status" class="text-red-500 font-medium">Connecting...</div>
                 <div id="sse-status" class="text-[10px] text-gray-500 uppercase tracking-widest">SSE: Awaiting</div>
             </div>
         </header>
 
-        <!-- ═══════════════════════════ TAB 1: COGNITIVE BUS ═══════════════════════════ -->
-        <main id="tab-bus" class="tab-pane pane-visible min-h-0 bg-gray-950">
-            <div class="flex-1 overflow-y-auto p-6 space-y-6 min-h-0" id="bus-messages">
-                <!-- Chat History renders here -->
-            </div>
-            
-            <!-- Fixed Input Bar -->
-            <div class="flex-shrink-0 border-t border-gray-800 bg-gray-900 p-4 flex items-center space-x-3">
-                <input id="bus-input" type="text" placeholder="Send a command to Codex..."
-                       class="flex-1 bg-gray-950 border border-gray-700 rounded-md px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono"
-                       onkeydown="if(event.key==='Enter')sendCommand()">
-                <button onclick="sendCommand()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-md text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-emerald-900/20">Send</button>
-            </div>
-        </main>
-
-        <!-- ═══════════════════════════ TAB 2: NEWS SUMMARY ═══════════════════════════ -->
-        <main id="tab-news" class="tab-pane pane-hidden min-h-0 bg-gray-950">
-            <!-- State A: List View -->
-            <div id="news-list-view" class="flex-1 overflow-y-auto p-6 space-y-4 min-h-0 pane-visible">
-                <div class="text-emerald-500 text-xs font-bold uppercase tracking-widest mb-6">Latest Intelligence Briefs</div>
-                <div id="news-headlines" class="space-y-4"></div>
-                <div id="news-empty" class="text-gray-600 text-sm italic">Loading briefs from PocketBase...</div>
-            </div>
-            
-            <!-- State B: Reading Pane -->
-            <div id="news-reader-view" class="flex-1 flex flex-col min-h-0 pane-hidden bg-gray-900">
-                <div class="flex-shrink-0 border-b border-gray-800 px-6 py-4 flex items-center space-x-4 bg-gray-900 shadow-sm z-10">
-                    <button onclick="closeReader()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-all border border-gray-700">← Back</button>
-                    <span id="reader-title" class="text-sm font-medium text-emerald-400 truncate"></span>
-                </div>
-                <div id="reader-content" class="flex-1 overflow-y-auto p-8 prose prose-invert prose-emerald max-w-4xl mx-auto streaming-text min-h-0 text-gray-300"></div>
-            </div>
-        </main>
-
-        <!-- ═══════════════════════════ TAB 3: MERCENARY TERMINAL ═══════════════════════════ -->
-        <main id="tab-merc" class="tab-pane pane-hidden min-h-0 bg-gray-950">
-            <div class="flex-1 flex flex-col p-6 space-y-6 min-h-0">
-                <!-- Top Mounted Dropdown -->
-                <div class="flex items-center space-x-4 flex-shrink-0 bg-gray-900 p-4 rounded-lg border border-gray-800">
-                    <label class="text-xs text-gray-500 uppercase tracking-widest font-bold">Cloud Edge:</label>
-                    <select id="merc-provider"
-                            class="flex-1 bg-gray-950 border border-gray-700 rounded px-4 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer">
-                        <option value="">Scanning nexus nodes...</option>
-                    </select>
-                    <label class="text-xs text-gray-500 uppercase tracking-widest font-bold ml-4">Payload:</label>
-                    <input id="merc-model" type="text" placeholder="auto"
-                           class="w-64 bg-gray-950 border border-gray-700 rounded px-4 py-2 text-sm text-gray-400 focus:outline-none focus:border-blue-500 transition-colors font-mono">
+        <!-- Main Content Area where tabs stack -->
+        <div id="main-content">
+            <!-- ═══════════════════════════ TAB 1: COGNITIVE BUS ═══════════════════════════ -->
+            <section id="tab-bus" class="tab-section pane-visible">
+                <div class="flex-1 overflow-y-auto p-6 space-y-6 min-h-0 flex flex-col" id="bus-messages">
+                    <!-- Chat History renders here -->
                 </div>
                 
-                <!-- Chat Output -->
-                <div id="merc-output" class="flex-1 overflow-y-auto bg-gray-900 border border-gray-800 rounded-lg p-6 space-y-4 min-h-0 shadow-inner">
-                    <div class="text-blue-500/50 italic text-xs uppercase tracking-widest">Mercenary Terminal Online. Awaiting directive.</div>
+                <div class="flex-shrink-0 border-t border-gray-800 bg-gray-900 p-4 flex items-center space-x-3">
+                    <input id="bus-input" type="text" placeholder="Send a command to Codex..."
+                           class="flex-1 bg-gray-950 border border-gray-700 rounded px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 transition-all font-mono"
+                           onkeydown="if(event.key==='Enter')sendCommand()">
+                    <button onclick="sendCommand()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded text-xs font-bold uppercase tracking-wider transition-all">Send</button>
                 </div>
-                
-                <!-- Large Mono-Spaced Textarea -->
-                <div class="flex-shrink-0 flex items-start space-x-4">
-                    <textarea id="merc-input" rows="4" placeholder="Enter multi-line prompt or code payload for execution..."
-                              class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-5 py-4 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-mono resize-none shadow-sm"></textarea>
-                    <button onclick="sendMercenary()" class="bg-blue-600 hover:bg-blue-500 text-white h-[88px] px-8 rounded-lg text-xs font-bold uppercase tracking-widest transition-all shadow-md shadow-blue-900/20">Execute</button>
+            </section>
+
+            <!-- ═══════════════════════════ TAB 2: NEWS SUMMARY ═══════════════════════════ -->
+            <section id="tab-news" class="tab-section pane-hidden">
+                <div class="flex-1 flex flex-col min-h-0 relative">
+                    <!-- State A: List View -->
+                    <div id="news-list-view" class="flex-1 overflow-y-auto p-6 space-y-4 min-h-0 pane-visible">
+                        <div class="text-emerald-500 text-xs font-bold uppercase tracking-widest mb-6">Latest Intelligence Briefs</div>
+                        <div id="news-headlines" class="space-y-4"></div>
+                        <div id="news-empty" class="text-gray-500 text-sm italic">Loading briefs from PocketBase...</div>
+                    </div>
+                    
+                    <!-- State B: Reading Pane -->
+                    <div id="news-reader-view" class="absolute inset-0 bg-gray-950 z-20 flex flex-col min-h-0 pane-hidden">
+                        <div class="flex-shrink-0 border-b border-gray-800 bg-gray-900 px-6 py-4 flex items-center space-x-4 shadow-sm">
+                            <button onclick="closeReader()" class="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-all">← Back</button>
+                            <span id="reader-title" class="text-sm font-medium text-emerald-400 truncate"></span>
+                        </div>
+                        <div id="reader-content" class="flex-1 overflow-y-auto p-8 prose prose-invert max-w-4xl mx-auto streaming-text min-h-0 text-gray-300"></div>
+                    </div>
                 </div>
-            </div>
-        </main>
+            </section>
+
+            <!-- ═══════════════════════════ TAB 3: MERCENARY TERMINAL ═══════════════════════════ -->
+            <section id="tab-merc" class="tab-section pane-hidden">
+                <div class="flex-1 flex flex-col p-6 space-y-6 min-h-0">
+                    <div class="flex items-center space-x-4 flex-shrink-0 bg-gray-900 p-4 rounded border border-gray-800">
+                        <label class="text-xs text-gray-500 uppercase tracking-widest font-bold">Cloud Edge:</label>
+                        <select id="merc-provider"
+                                class="flex-1 bg-gray-800 border border-gray-700 rounded px-4 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500 transition-colors">
+                            <option value="">Scanning nexus nodes...</option>
+                        </select>
+                        <label class="text-xs text-gray-500 uppercase tracking-widest font-bold ml-4">Model:</label>
+                        <input id="merc-model" type="text" placeholder="auto"
+                               class="w-64 bg-gray-800 border border-gray-700 rounded px-4 py-2 text-sm text-gray-400 focus:outline-none focus:border-blue-500 transition-colors font-mono">
+                    </div>
+                    
+                    <div id="merc-output" class="flex-1 overflow-y-auto bg-gray-900 border border-gray-800 rounded p-6 space-y-4 min-h-0">
+                        <div class="text-blue-500/50 italic text-xs uppercase tracking-widest">Mercenary Terminal Online. Awaiting directive.</div>
+                    </div>
+                    
+                    <div class="flex-shrink-0 flex items-start space-x-4">
+                        <textarea id="merc-input" rows="4" placeholder="Enter multi-line prompt for execution..."
+                                  class="flex-1 bg-gray-900 border border-gray-700 rounded px-5 py-4 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-all font-mono resize-none"></textarea>
+                        <button onclick="sendMercenary()" class="bg-blue-600 hover:bg-blue-500 text-white h-[98px] px-8 rounded text-xs font-bold uppercase tracking-widest transition-all">Execute</button>
+                    </div>
+                </div>
+            </section>
+        </div>
     </div>
 
     <!-- ═══════════════════════════ JAVASCRIPT ═══════════════════════════ -->
@@ -186,16 +204,13 @@
         function switchTab(name) {
             tabs.forEach(t => {
                 const isMatch = t === name;
-                // Toggle view state engine
-                document.getElementById(`tab-${t}`).className = `tab-pane min-h-0 bg-gray-950 ${isMatch ? 'pane-visible' : 'pane-hidden'}`;
+                document.getElementById(`tab-${t}`).className = `tab-section ${isMatch ? 'pane-visible' : 'pane-hidden'}`;
                 
-                // Visual Feedback (Emerald-500 for active, Gray-400 for inactive)
                 const btn = document.getElementById(`btn-${t}`);
                 if (isMatch) {
-                    btn.className = 'border-b-2 border-emerald-500 text-emerald-500 pb-2 transition-colors uppercase';
-                    if(t === 'merc') btn.className = 'border-b-2 border-blue-500 text-blue-500 pb-2 transition-colors uppercase';
+                    btn.className = `border-b-2 ${t === 'merc' ? 'border-blue-500 text-white' : 'border-emerald-500 text-white'} pb-4 transition-colors uppercase`;
                 } else {
-                    btn.className = 'border-b-2 border-transparent text-gray-400 hover:text-gray-200 pb-2 transition-colors uppercase';
+                    btn.className = 'border-b-2 border-transparent text-gray-500 hover:text-gray-300 pb-4 transition-colors uppercase';
                 }
             });
             if (name === 'news') loadNews();
@@ -207,7 +222,7 @@
             const isCEO = role === 'CEO';
             const bubble = document.createElement('div');
             
-            // Phase 3: Alignment & Bubbles (Blue-900/40 vs Emerald-900/40)
+            // User right (Dark Blue/900), Codex left (Dark Emerald/900)
             bubble.className = `flex flex-col ${isCEO ? 'items-end' : 'items-start'} animate-fade-in w-full`;
 
             let rendered = text;
@@ -215,8 +230,8 @@
 
             bubble.innerHTML = `
                 <div class="text-[10px] text-gray-500 mb-1.5 uppercase tracking-widest font-bold">${isCEO ? '🧑‍💼 CEO' : '🤖 Codex'}</div>
-                <div class="max-w-[85%] px-5 py-4 rounded-2xl ${isCEO ? 'bg-blue-900/40 border border-blue-800/50 rounded-tr-sm' : 'bg-emerald-900/40 border border-emerald-800/50 rounded-tl-sm'}">
-                    <div class="prose prose-invert prose-sm max-w-none streaming-text ${isCEO ? 'text-blue-100' : 'text-emerald-50'}">${rendered}</div>
+                <div class="max-w-[85%] px-5 py-4 rounded-xl ${isCEO ? 'bg-blue-900 border border-blue-800' : 'bg-emerald-900 border border-emerald-800'}">
+                    <div class="prose prose-invert prose-sm max-w-none streaming-text text-gray-100">${rendered}</div>
                 </div>`;
             container.appendChild(bubble);
             container.scrollTop = container.scrollHeight;
@@ -241,8 +256,12 @@
         // ── SSE & Network ──
         function initSSE() {
             const statusEl = document.getElementById('sse-status');
+            const pulse = document.getElementById('global-pulse');
+            const connStatus = document.getElementById('connection-status');
+            
             if (currentSSE) currentSSE.close();
             
+            // Direct Connection specified in Phase 5
             const sse = new EventSource(`${PB_URL}/api/realtime`);
             currentSSE = sse;
 
@@ -250,6 +269,9 @@
                 try {
                     const clientId = JSON.parse(e.data).clientId;
                     statusEl.innerHTML = '<span class="text-emerald-400 font-bold">STREAM LIVE</span>';
+                    connStatus.innerHTML = '<span class="text-emerald-400">● Bus Connected</span>';
+                    pulse.className = 'w-3 h-3 bg-emerald-500 rounded-full animate-pulse';
+                    
                     fetch(`${PB_URL}/api/realtime`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -269,6 +291,8 @@
 
             sse.onerror = () => {
                 statusEl.innerHTML = '<span class="text-red-500">OFFLINE</span>';
+                connStatus.innerHTML = '<span class="text-red-500">● Disconnected</span>';
+                pulse.className = 'w-3 h-3 bg-red-500 rounded-full'; // solid red, no pulse
                 sse.close();
                 setTimeout(initSSE, 5000);
             };
@@ -277,8 +301,6 @@
         async function checkPB() {
             try {
                 await pb.health.check();
-                document.getElementById('connection-status').innerHTML = '<span class="text-emerald-400">● Core Online</span>';
-                document.getElementById('global-pulse').className = 'w-3 h-3 bg-emerald-500 rounded-full animate-pulse';
                 
                 document.getElementById('bus-messages').innerHTML = '';
                 const records = await pb.collection('transcripts').getList(1, 50, { sort: 'created' });
@@ -288,6 +310,7 @@
             } catch(e) {
                 document.getElementById('connection-status').innerHTML = '<span class="text-red-500">● Offline</span>';
                 document.getElementById('global-pulse').className = 'w-3 h-3 bg-red-500 rounded-full';
+                document.getElementById('sse-status').innerHTML = '<span class="text-red-500">OFFLINE</span>';
                 setTimeout(checkPB, 5000);
             }
         }
@@ -310,7 +333,7 @@
                 container.innerHTML = '';
                 newsArticles.forEach((article, idx) => {
                     const card = document.createElement('div');
-                    card.className = 'bg-gray-900 border border-gray-800 rounded-xl p-5 cursor-pointer hover:border-emerald-600 hover:bg-gray-800/80 transition-all animate-fade-in shadow-sm group';
+                    card.className = 'bg-gray-900 border border-gray-800 rounded p-5 cursor-pointer hover:border-emerald-600 transition-all animate-fade-in shadow-sm';
                     card.onclick = () => openReader(idx);
 
                     const title = article.title || article.headline || 'Encrypted Brief';
@@ -320,7 +343,7 @@
                     card.innerHTML = `
                         <div class="flex items-start justify-between">
                             <div class="flex-1 pr-4">
-                                <div class="text-gray-100 font-bold text-base mb-2 group-hover:text-emerald-400 transition-colors">${title}</div>
+                                <div class="text-gray-100 font-bold text-base mb-2">${title}</div>
                                 <div class="text-gray-400 text-sm leading-relaxed line-clamp-2 streaming-text">${summary.substring(0, 250)}${summary.length > 250 ? '...' : ''}</div>
                             </div>
                             <div class="text-[10px] text-gray-500 whitespace-nowrap font-mono tracking-widest uppercase mt-1 border border-gray-700 px-2 py-1 rounded bg-gray-950">${date}</div>
@@ -341,11 +364,11 @@
             catch(e) { document.getElementById('reader-content').textContent = content; }
 
             document.getElementById('news-list-view').className = 'flex-1 overflow-y-auto p-6 space-y-4 min-h-0 pane-hidden';
-            document.getElementById('news-reader-view').className = 'flex-1 flex flex-col min-h-0 pane-visible';
+            document.getElementById('news-reader-view').className = 'absolute inset-0 bg-gray-950 z-20 flex flex-col min-h-0 pane-visible';
         }
 
         function closeReader() {
-            document.getElementById('news-reader-view').className = 'flex-1 flex flex-col min-h-0 pane-hidden';
+            document.getElementById('news-reader-view').className = 'absolute inset-0 bg-gray-950 z-20 flex flex-col min-h-0 pane-hidden';
             document.getElementById('news-list-view').className = 'flex-1 overflow-y-auto p-6 space-y-4 min-h-0 pane-visible';
         }
 
@@ -379,8 +402,8 @@
 
             div.innerHTML = `
                 <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 font-bold">${isUser ? '🧑‍💻 YOU (TERMINAL)' : '☁️ CLOUD PAYLOAD'}</div>
-                <div class="bg-gray-950 border ${isUser ? 'border-gray-800' : 'border-blue-900/50'} rounded-lg px-5 py-4 text-sm streaming-text shadow-sm">
-                    <div class="prose prose-invert prose-sm max-w-none text-gray-300 ${isUser ? 'text-gray-400' : 'text-gray-200'}">${rendered}</div>
+                <div class="bg-gray-950 border ${isUser ? 'border-gray-800' : 'border-blue-900'} rounded px-5 py-4 text-sm streaming-text">
+                    <div class="prose prose-invert prose-sm max-w-none ${isUser ? 'text-gray-400' : 'text-gray-200'}">${rendered}</div>
                 </div>`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
