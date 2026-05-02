@@ -63,6 +63,7 @@ class ChatRequest(BaseModel):
     model: str
     messages: list
     temperature: float = 0.2
+    response_format: dict = None
 
 PROVIDERS = {
     "Cerebras Cloud": {"url": "https://api.cerebras.ai/v1/chat/completions", "env_key": "CEREBRAS_API_KEY"},
@@ -178,6 +179,9 @@ def route_chat(req: ChatRequest):
         "messages": req.messages,
         "temperature": req.temperature
     }
+    
+    if req.response_format:
+        payload["response_format"] = req.response_format
 
     return execute_request_with_backoff(provider_config["url"], headers, payload)
 

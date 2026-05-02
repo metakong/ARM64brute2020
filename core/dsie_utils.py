@@ -18,16 +18,11 @@ from dotenv import load_dotenv
 GEMINI_MODEL = "gemini-3-flash-preview"
 
 def clean_json_response(raw_text):
-    """Robustly strips markdown and trailing garbage from LLM JSON responses."""
-    clean_text = raw_text.strip()
-    if clean_text.startswith("```"):
-        lines = clean_text.split('\n')
-        if lines and lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].startswith("```"):
-            lines = lines[:-1]
-        clean_text = '\n'.join(lines).strip()
-    return clean_text
+    """
+    DEPRECATED: Native structured outputs are now enforced via API schema (May 2026).
+    This function remains as a pass-through to avoid breaking legacy imports.
+    """
+    return raw_text.strip()
 
 def execute_with_backoff(func, *args, max_retries=5, base_delay=3, **kwargs):
     for attempt in range(max_retries):

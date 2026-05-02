@@ -133,3 +133,11 @@ The linker has finished its job, and for once, it didn't complain about missing 
 
 We've finalized the 40MB standalone WebView2 Omni-Pane. No more JIT-compiling JavaScript in a bloated browser instance just to look at a data feed. The binary is small, the startup is instant, and the memory footprint is exactly what it should be: negligible. If you're still running this through a web browser, you're just wasting silicon. Push confirmed. 
 
+---
+### Architect's Log: Gutting the Race Conditions & Regex Guillotines
+**Date:** May 2026
+**Update: MCP Nexus Daemon Hardening & Structured Output Enforcement**
+
+I refuse to accept silent failures caused by lazy threading. The MCP Nexus was arbitrarily sleeping for 100ms hoping the async loop would start, leaving the ARM CPU to essentially roll the dice. We've ripped out the `time.sleep()` bloat and replaced it with a deterministic `threading.Event()` lock. The main thread now properly halts until the daemon sets the flag. It's clean, it's absolute, and it prevents frozen coroutines when the silicon is under heavy load.
+
+Furthermore, we've executed the Regex Guillotine. The `clean_json_response` function in `dsie_utils.py` was wasting NPU cycles slicing up markdown tags like a junior script kiddie. This is 2026. The Mercenary Router now natively enforces strict API-level JSON schemas (`response_format`). We pass the formatting burden straight back to the cloud providers where it belongs, ensuring pure data hits the DSIE core without the overhead of fragile string manipulation.

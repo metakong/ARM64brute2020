@@ -31,6 +31,7 @@ _available_tools = []
 _loop = None
 _thread = None
 _initialized = False
+_loop_ready = threading.Event()
 
 
 def _start_nexus_loop():
@@ -38,6 +39,7 @@ def _start_nexus_loop():
     global _loop
     _loop = asyncio.new_event_loop()
     asyncio.set_event_loop(_loop)
+    _loop_ready.set()
     _loop.run_forever()
 
 
@@ -45,11 +47,11 @@ def _ensure_thread():
     """Lazily starts the nexus event loop thread."""
     global _thread
     if _thread is None or not _thread.is_alive():
+        _loop_ready.clear()
         _thread = threading.Thread(target=_start_nexus_loop, daemon=True)
         _thread.start()
-        # Give the loop a moment to initialize
-        import time
-        time.sleep(0.1)
+        # Block main thread deterministically until loop is running
+        _loop_ready.wait()
 
 
 def _run_in_nexus_loop(coro):
