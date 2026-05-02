@@ -210,6 +210,15 @@ async def omni_chat(req: PromptRequest, background_tasks: BackgroundTasks):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/briefs")
+def get_briefs():
+    import json
+    briefs_path = os.path.join(os.path.dirname(__file__), "..", "dashboard", "consolidated_briefs.json")
+    if os.path.exists(briefs_path):
+        with open(briefs_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
 if __name__ == "__main__":
     import uvicorn
     print("[SYSTEM] Booting DSIE Mercenary Router on Port 8000...")
