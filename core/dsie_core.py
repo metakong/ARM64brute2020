@@ -152,10 +152,9 @@ class DSIECore:
         except Exception: pass
 
     def process_text(self, clean_text):
-        """Processes text through the NPU inference engine."""
+        """Processes text through the NPU inference engine with strict context management."""
         lower_text = clean_text.lower()
         words = clean_text.split()
-        current_date = datetime.datetime.now().strftime('%A, %B %d, %Y')
 
         if lower_text in ["codex shutdown", "codex sleep"]:
             self.speak("Shutting down. Goodbye, CEO.")
@@ -169,77 +168,75 @@ class DSIECore:
             return "Memory secured."
 
         # ==========================================
-        # VANGUARD ROUTER LOGIC
+        # PHASE 1: THE CONTEXT GUILLOTINE
         # ==========================================
-        routing_decision = "Local"
-        first_10_words = " ".join(words[:10]).lower()
-        triggers = ["cloud", "gemini", "complex", "analyze", "code", "search", "database", "web", "internet", "osint", "news", "current", "email", "gmail", "inbox", "reply", "send", "message", "communications"]
-        force_cloud = any(t in first_10_words for t in triggers)
-        
-        log_intent(clean_text, routing_decision if not force_cloud else "Cloud")
+        allowed_tools = ["delegate_to_gemini", "osint_scrape", "fetch_unread_emails"]
+        available_mcp_tools = [t for t in get_tools_for_llm() if t.name in allowed_tools]
+        tools = [{"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.inputSchema}} for t in available_mcp_tools]
 
-        capability_schema = f"""
-        DOMAIN: Edge Routing / Status Notification.
-        CONSTRAINTS: 4B Parameter limit. No local file access.
-        GOAL: Analyze intent. Today is {current_date}. 
-        
-        SOP-04 (Context Hydration): If the user's prompt implies "working theory", "SOP", "rules", or "business logic", 
-        you MUST execute fetch_business_sop to retrieve the local context. 
-        Once retrieved, you MUST include that context in your payload when triggering delegate_to_gemini.
-
-        SOP-05 (Asynchronous Handoff): If the user's prompt requests a deep research report, a long-running scrape, or contains "Background", 
-        you MUST immediately acknowledge the handoff by speaking: "[SOP-Active] Dispatching task to the background queue."
-
-        SOP-06 (OSINT Chaining): If the user's prompt requests current data, news, or explicitly asks to "search the web", 
-        you MUST first call osint_scrape to gather raw internet data. 
-        Once the data is retrieved, you MUST package that raw data into the payload for delegate_to_gemini and dispatch it to the background queue.
-
-        SOP-07 (Comms Chaining): If the user asks to check email or read the inbox, you MUST use fetch_unread_emails, 
-        then package the retrieved text into delegate_to_gemini for summarization. 
-        If the user asks to reply or send an email, you MUST package the request into delegate_to_gemini to draft the professional response, 
-        and then use send_email to dispatch the resulting draft.
-        
-        If the user request is complex or matches your trigger list, use the delegate_to_gemini tool.
-        """
+        # ==========================================
+        # PHASE 2: SYSTEM PROMPT REDUCTION (< 100 tokens)
+        # ==========================================
+        capability_schema = "You are an edge router. Jobs: read news (osint_scrape), read email (fetch_unread_emails), or delegate (delegate_to_gemini). For complex tasks or long prompts, call delegate_to_gemini."
         
         messages = [
             {"role": "system", "content": capability_schema},
             {"role": "user", "content": clean_text}
         ]
 
-        available_mcp_tools = get_tools_for_llm()
-        tools = [{"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.inputSchema}} for t in available_mcp_tools]
+        try:
+            # Use filtered tools to avoid NPU context overload
+            response = self.chat_client.complete_chat(messages, tools=tools)
+            prefix = "[SOP-Active]"
 
-        # NOTE: tool_choice is NOT supported by the Foundry Local SDK's ChatClient.
-        # Tool routing is enforced via the system prompt (capability_schema) and
-        # the force_cloud trigger list above.
-        response = self.chat_client.complete_chat(messages, tools=tools)
-        
-        prefix = "[SOP-Active]"
-        if response.choices[0].message.tool_calls:
-            tool_names = [tc.function.name for tc in response.choices[0].message.tool_calls]
-            self.speak(f"[SOP-Active] -> Routing to {', '.join(tool_names)}")
+            if response.choices[0].message.tool_calls:
+                tool_names = [tc.function.name for tc in response.choices[0].message.tool_calls]
+                self.speak(f"[SOP-Active] -> Routing to {', '.join(tool_names)}")
 
-            assistant_msg = {
-                "role": "assistant",
-                "content": response.choices[0].message.content,
-                "tool_calls": [{"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}} for tc in response.choices[0].message.tool_calls]
-            }
-            messages.append(assistant_msg)
+                assistant_msg = {
+                    "role": "assistant",
+                    "content": response.choices[0].message.content,
+                    "tool_calls": [{"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}} for tc in response.choices[0].message.tool_calls]
+                }
+                messages.append(assistant_msg)
 
-            for tool_call in response.choices[0].message.tool_calls:
-                tool_name = tool_call.function.name
-                tool_args = json.loads(tool_call.function.arguments)
-                print(f"  [MCP EXECUTE] Calling: {tool_name}")
-                tool_result = call_mcp_tool_sync(tool_name, tool_args)
-
-                if tool_name == "delegate_to_gemini": prefix = "[Vanguard-Result]"
-                messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": str(tool_result)})
+                for tool_call in response.choices[0].message.tool_calls:
+                    tool_name = tool_call.function.name
+                    # ==========================================
+                    # PHASE 3: THE "DUMB SWITCHBOARD" FALLBACK
+                    # ==========================================
+                    try:
+                        tool_args = json.loads(tool_call.function.arguments)
+                        print(f"  [MCP EXECUTE] Calling: {tool_name}")
+                        tool_result = call_mcp_tool_sync(tool_name, tool_args)
+                        
+                        if tool_name == "delegate_to_gemini": prefix = "[Vanguard-Result]"
+                        messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": str(tool_result)})
+                    except Exception as e:
+                        print(f"[NPU] Cognitive routing failure ({tool_name}): {e}. Bypassing to Cloud Vanguard.")
+                        # Auto-Delegation Fallback: Pass original prompt to Gemini
+                        tool_result = call_mcp_tool_sync("delegate_to_gemini", {"task_description": clean_text})
+                        prefix = "[Vanguard-Result]"
+                        messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": str(tool_result)})
+                
                 gc.collect()
+                response = self.chat_client.complete_chat(messages)
+            else:
+                prefix = "[Local-FreeStyle]"
 
-            response = self.chat_client.complete_chat(messages)
-        else:
-            prefix = "[Local-FreeStyle]"
+        except Exception as e:
+            print(f"[NPU] Critical inference/parsing error: {e}. Global fallback triggered.")
+            # Critical Level Fallback: Entire pipeline failed, force Gemini
+            tool_result = call_mcp_tool_sync("delegate_to_gemini", {"task_description": clean_text})
+            prefix = "[Vanguard-Result]"
+            # Mock the response structure for the final reply assembly
+            class MockMessage:
+                def __init__(self, content): self.content = content
+            class MockChoice:
+                def __init__(self, content): self.message = MockMessage(content)
+            class MockResponse:
+                def __init__(self, content): self.choices = [MockChoice(content)]
+            response = MockResponse(str(tool_result))
 
         reply = f"{prefix} {response.choices[0].message.content.strip()}"
         self.push_transcript("CEO", clean_text)
