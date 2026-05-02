@@ -70,8 +70,20 @@
         /* ════════════════════════════════════════════════
            PHASE 3: VIEW STATE ENGINE
            ════════════════════════════════════════════════ */
-        .pane-hidden { content-visibility: hidden; }
-        .pane-visible { content-visibility: visible; }
+        .pane-hidden { 
+            content-visibility: hidden; 
+            position: absolute;
+            pointer-events: none;
+            opacity: 0;
+            z-index: -1;
+        }
+        .pane-visible { 
+            content-visibility: visible; 
+            position: relative;
+            pointer-events: auto;
+            opacity: 1;
+            z-index: 10;
+        }
 
         /* All tabs occupy the same cell in main-content */
         .tab-section {
@@ -80,6 +92,7 @@
             display: flex;
             flex-direction: column;
             height: 100%;
+            width: 100%;
             min-height: 0;
         }
 
@@ -104,7 +117,7 @@
 
     <div id="app-root">
         <!-- ═══════════════════════════ HEADER ═══════════════════════════ -->
-        <header class="bg-gray-900 border-b border-gray-800 shadow-lg flex items-center justify-between px-6 z-10">
+        <header class="bg-gray-900 border-b border-gray-800 shadow-lg flex items-center justify-between px-6 z-20">
             <div class="flex items-center space-x-6 h-full">
                 <!-- Branding & Status -->
                 <div class="flex items-center space-x-3">
@@ -134,7 +147,7 @@
                     <!-- Chat History renders here -->
                 </div>
                 
-                <div class="flex-shrink-0 border-t border-gray-800 bg-gray-900 p-4 flex items-center space-x-3">
+                <div class="flex-shrink-0 border-t border-gray-800 bg-gray-900 p-4 flex items-center space-x-3 z-20">
                     <input id="bus-input" type="text" placeholder="Send a command to Codex..."
                            class="flex-1 bg-gray-950 border border-gray-700 rounded px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 transition-all font-mono"
                            onkeydown="if(event.key==='Enter')sendCommand()">
@@ -149,7 +162,7 @@
                     <div id="news-list-view" class="flex-1 overflow-y-auto p-6 space-y-4 min-h-0 pane-visible">
                         <div class="text-emerald-500 text-xs font-bold uppercase tracking-widest mb-6">Latest Intelligence Briefs</div>
                         <div id="news-headlines" class="space-y-4"></div>
-                        <div id="news-empty" class="text-gray-500 text-sm italic">Loading briefs from PocketBase...</div>
+                        <div id="news-empty" class="text-gray-500 text-sm italic">Loading briefs...</div>
                     </div>
                     
                     <!-- State B: Reading Pane -->
@@ -166,7 +179,7 @@
             <!-- ═══════════════════════════ TAB 3: MERCENARY TERMINAL ═══════════════════════════ -->
             <section id="tab-merc" class="tab-section pane-hidden">
                 <div class="flex-1 flex flex-col p-6 space-y-6 min-h-0">
-                    <div class="flex items-center space-x-4 flex-shrink-0 bg-gray-900 p-4 rounded border border-gray-800">
+                    <div class="flex items-center space-x-4 flex-shrink-0 bg-gray-900 p-4 rounded border border-gray-800 z-10">
                         <label class="text-xs text-gray-500 uppercase tracking-widest font-bold">Cloud Edge:</label>
                         <select id="merc-provider"
                                 class="flex-1 bg-gray-800 border border-gray-700 rounded px-4 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500 transition-colors">
@@ -181,7 +194,7 @@
                         <div class="text-blue-500/50 italic text-xs uppercase tracking-widest">Mercenary Terminal Online. Awaiting directive.</div>
                     </div>
                     
-                    <div class="flex-shrink-0 flex items-start space-x-4">
+                    <div class="flex-shrink-0 flex items-start space-x-4 z-10">
                         <textarea id="merc-input" rows="4" placeholder="Enter multi-line prompt for execution..."
                                   class="flex-1 bg-gray-900 border border-gray-700 rounded px-5 py-4 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-all font-mono resize-none"></textarea>
                         <button onclick="sendMercenary()" class="bg-blue-600 hover:bg-blue-500 text-white h-[98px] px-8 rounded text-xs font-bold uppercase tracking-widest transition-all">Execute</button>
@@ -322,9 +335,12 @@
             const container = document.getElementById('news-headlines');
             const emptyEl = document.getElementById('news-empty');
             try {
-                const records = await pb.collection('daily_briefs').getList(1, 30, { sort: '-created' });
-                newsArticles = records.items;
-                if (newsArticles.length === 0) {
+                // Fetch directly from consolidated_briefs.json generated by agent
+                const res = await fetch('consolidated_briefs.json');
+                const records = await res.json();
+                newsArticles = records;
+                
+                if (!Array.isArray(newsArticles) || newsArticles.length === 0) {
                     emptyEl.textContent = 'No intelligence briefs currently cached.';
                     emptyEl.className = 'text-gray-500 text-sm italic pane-visible';
                     return;
@@ -336,9 +352,11 @@
                     card.className = 'bg-gray-900 border border-gray-800 rounded p-5 cursor-pointer hover:border-emerald-600 transition-all animate-fade-in shadow-sm';
                     card.onclick = () => openReader(idx);
 
-                    const title = article.title || article.headline || 'Encrypted Brief';
-                    const summary = article.summary || article.text || '';
-                    const date = new Date(article.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    // Map agent output keys to ui
+                    const title = article.cluster_topic || article.title || article.headline || 'Encrypted Brief';
+                    const summary = article.executive_summary || article.summary || article.text || '';
+                    
+                    const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
                     card.innerHTML = `
                         <div class="flex items-start justify-between">
@@ -350,14 +368,18 @@
                         </div>`;
                     container.appendChild(card);
                 });
-            } catch(e) {}
+            } catch(e) {
+                emptyEl.textContent = 'Failed to load briefs. File not found or corrupted.';
+                emptyEl.className = 'text-red-500 text-sm italic pane-visible';
+                console.error('[NEWS]', e);
+            }
         }
 
         function openReader(idx) {
             const article = newsArticles[idx];
             if (!article) return;
-            const title = article.title || article.headline || 'Brief';
-            const content = article.longform || article.content || article.text || article.summary || '';
+            const title = article.cluster_topic || article.title || article.headline || 'Brief';
+            const content = article.longform || article.content || article.text || article.executive_summary || '';
 
             document.getElementById('reader-title').textContent = title;
             try { document.getElementById('reader-content').innerHTML = marked.parse(content); } 
