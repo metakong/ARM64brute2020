@@ -1,3 +1,15 @@
+> **Transparency Notice:** This documentation was authored by Claude Sonnet 4.6 (Anthropic) under direct human oversight — the same iterative, human-in-the-loop AI partnership methodology used to architect and build every system in this portfolio.
+
+> **Portfolio Context** | **Sean Deardorff** — Strategic Operations & Business Development
+>
+> This repository is an artifact of high-velocity, AI-partnered process engineering. It demonstrates how the author builds resilient, automated business machinery — translating the same decoupled logic, governance, and defensive optimization used to manage open sales territories and corporate operations into working code.
+>
+> **Career Connection:** This bare-metal hardware optimization project reflects the same system-level resourcefulness Sean demonstrated at eBay Enterprises — operating with privileged access to AS/400 terminals (IBM 5250), executing nightly EDI/SQL batch processing, and uncovering hidden metric manipulation through deep formula tracing. When the abstraction layer fails or the vendor says "unsupported," the instinct is the same: go deeper into the machine and make it work.
+>
+> [View Full Portfolio →](https://github.com/metakong/sean-deardorff)
+
+---
+
 # 🦍 ARM64brute2020: The NPU Liberation Project
 
 ![Architecture](https://img.shields.io/badge/Architecture-ARM64-blue) ![OS](https://img.shields.io/badge/OS-Windows_11_on_ARM-blueviolet) ![Device](https://img.shields.io/badge/Device-Galaxy_Book_Go_5G-lightgrey) ![Status](https://img.shields.io/badge/Status-Foundational_Alpha-success)
